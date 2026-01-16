@@ -92,10 +92,15 @@ var runCmd = &cobra.Command{
 
 go 1.23.6
 
-require github.com/repyh3/typego v0.0.0-20260116052821-59a9d21c7be3
+require github.com/repyh3/typego v0.0.0
 `
 		os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(shimContent), 0644)
 		os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
+
+		// Fetch latest typego module
+		getCmd := exec.Command("go", "get", "github.com/repyh3/typego@latest")
+		getCmd.Dir = tmpDir
+		getCmd.Run()
 
 		// Tidy
 		tidy := exec.Command("go", "mod", "tidy")

@@ -116,13 +116,18 @@ var buildCmd = &cobra.Command{
 
 go 1.23.6
 
-require github.com/repyh3/typego v0.0.0-20260116052821-59a9d21c7be3
+require github.com/repyh3/typego v0.0.0
 `
 
 		if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644); err != nil {
 			fmt.Printf("Error writing go.mod: %v\n", err)
 			os.Exit(1)
 		}
+
+		// Fetch latest typego module
+		getCmd := exec.Command("go", "get", "github.com/repyh3/typego@latest")
+		getCmd.Dir = tmpDir
+		getCmd.Run()
 
 		// 5. Build Binary
 		outputName := buildOut
