@@ -54,7 +54,7 @@ func Compile(entryPoint string, virtualModules map[string]string) (*Result, erro
 						case "go/fmt":
 							content = "const f = (globalThis as any).__go_fmt__; export const Println = f.Println;"
 						case "go/os":
-							content = "const o = (globalThis as any).__go_os__; export const WriteFile = o.WriteFile;"
+							content = "const o = (globalThis as any).__go_os__; export const WriteFile = o.WriteFile; export const ReadFile = o.ReadFile;"
 						case "go/net/http":
 							content = "const h = (globalThis as any).__go_http__; export const Get = h.Get; export const Fetch = h.Fetch;"
 						case "go/sync":

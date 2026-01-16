@@ -31,14 +31,15 @@ func (h *HTTPModule) Get(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 		}
 		defer resp.Body.Close()
 
-		// Safeguard against OOM by limiting the reader
-		limitedReader := &io.LimitedReader{R: resp.Body, N: maxResponseBodySize}
-		body, err := io.ReadAll(limitedReader)
+		// Safeguard against OOM by limiting the reader to max + 1
+		// If we read max + 1 bytes, we know it's too large.
+		limit := int64(maxResponseBodySize)
+		body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 		if err != nil && err != io.EOF {
 			panic(vm.NewTypeError(fmt.Sprintf("http body read error: %v", err)))
 		}
 
-		if limitedReader.N <= 0 {
+		if int64(len(body)) > limit {
 			panic(vm.NewTypeError(fmt.Sprintf("http response too large (max %d MB)", maxResponseBodySize/1024/1024)))
 		}
 
@@ -72,15 +73,15 @@ func RegisterHTTP(vm *goja.Runtime, el *eventloop.EventLoop) {
 			}
 			defer resp.Body.Close()
 
-			limitedReader := &io.LimitedReader{R: resp.Body, N: maxResponseBodySize}
-			body, err := io.ReadAll(limitedReader)
+			limit := int64(maxResponseBodySize)
+			body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 
 			el.RunOnLoop(func() {
 				if err != nil && err != io.EOF {
 					reject(vm.NewTypeError(fmt.Sprintf("Fetch body read error: %v", err)))
 					return
 				}
-				if limitedReader.N <= 0 {
+				if int64(len(body)) > limit {
 					reject(vm.NewTypeError(fmt.Sprintf("Fetch response too large (max %d MB)", maxResponseBodySize/1024/1024)))
 					return
 				}

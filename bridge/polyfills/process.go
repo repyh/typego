@@ -12,12 +12,25 @@ import (
 func EnableProcess(vm *goja.Runtime) {
 	proc := vm.NewObject()
 
-	// process.env
+	// process.env (Filtered for security)
 	env := vm.NewObject()
+	whitelist := map[string]bool{
+		"PATH":     true,
+		"LANG":     true,
+		"PWD":      true,
+		"HOSTNAME": true,
+		"USER":     true,
+	}
+
 	for _, e := range os.Environ() {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
-			env.Set(parts[0], parts[1])
+			key := parts[0]
+			upperKey := strings.ToUpper(key)
+			// Allow whitelisted vars or anything prefixed with TYPEGO_
+			if whitelist[upperKey] || strings.HasPrefix(upperKey, "TYPEGO_") {
+				env.Set(key, parts[1])
+			}
 		}
 	}
 	// Force color support for libraries like chalk
