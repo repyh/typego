@@ -87,25 +87,33 @@ var runCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Generate go.mod
+		// Generate go.mod (minimal, let go get figure out versions)
 		goModContent := `module typego_run
 
 go 1.23.6
-
-require github.com/repyh3/typego v0.0.0
 `
-		os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(shimContent), 0644)
 		os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
 
-		// Fetch latest typego module
-		getCmd := exec.Command("go", "get", "github.com/repyh3/typego@latest")
-		getCmd.Dir = tmpDir
-		getCmd.Run()
+		// Fetch all required typego packages
+		packages := []string{
+			"github.com/repyh3/typego/bridge",
+			"github.com/repyh3/typego/bridge/polyfills",
+			"github.com/repyh3/typego/engine",
+			"github.com/repyh3/typego/eventloop",
+			"github.com/dop251/goja",
+		}
+		for _, pkg := range packages {
+			getCmd := exec.Command("go", "get", pkg+"@latest")
+			getCmd.Dir = tmpDir
+			getCmd.Env = append(os.Environ(), "GOPROXY=direct")
+			getCmd.Run()
+		}
 
-		// Tidy
+		// Tidy to ensure all dependencies are resolved
 		tidy := exec.Command("go", "mod", "tidy")
 		tidy.Dir = tmpDir
-		tidy.Run() // Ignore errors, build might still work if cached
+		tidy.Env = append(os.Environ(), "GOPROXY=direct")
+		tidy.Run()
 
 		// Build
 		exePath := filepath.Join(tmpDir, "app.exe")

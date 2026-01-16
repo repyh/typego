@@ -115,8 +115,6 @@ var buildCmd = &cobra.Command{
 		goModContent := `module typego_app
 
 go 1.23.6
-
-require github.com/repyh3/typego v0.0.0
 `
 
 		if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644); err != nil {
@@ -124,10 +122,20 @@ require github.com/repyh3/typego v0.0.0
 			os.Exit(1)
 		}
 
-		// Fetch latest typego module
-		getCmd := exec.Command("go", "get", "github.com/repyh3/typego@latest")
-		getCmd.Dir = tmpDir
-		getCmd.Run()
+		// Fetch all required typego packages
+		packages := []string{
+			"github.com/repyh3/typego/bridge",
+			"github.com/repyh3/typego/bridge/polyfills",
+			"github.com/repyh3/typego/engine",
+			"github.com/repyh3/typego/eventloop",
+			"github.com/dop251/goja",
+		}
+		for _, pkg := range packages {
+			getCmd := exec.Command("go", "get", pkg+"@latest")
+			getCmd.Dir = tmpDir
+			getCmd.Env = append(os.Environ(), "GOPROXY=direct")
+			getCmd.Run()
+		}
 
 		// 5. Build Binary
 		outputName := buildOut
@@ -140,6 +148,7 @@ require github.com/repyh3/typego v0.0.0
 		fmt.Println("🧹 Resolving dependencies...")
 		tidyCmd := exec.Command("go", "mod", "tidy")
 		tidyCmd.Dir = tmpDir
+		tidyCmd.Env = append(os.Environ(), "GOPROXY=direct")
 		tidyCmd.Stdout = os.Stdout
 		tidyCmd.Stderr = os.Stderr
 		if err := tidyCmd.Run(); err != nil {
