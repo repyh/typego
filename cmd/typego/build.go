@@ -94,7 +94,12 @@ var buildCmd = &cobra.Command{
 		var importBlock strings.Builder
 		for _, imp := range res.Imports {
 			if len(imp) > 3 && imp[:3] == "go:" {
-				importBlock.WriteString(fmt.Sprintf("\t\"%s\"\n", imp[3:]))
+				cleanImp := imp[3:]
+				// Skip hardcoded imports in shimTemplate
+				if cleanImp == "fmt" || cleanImp == "os" {
+					continue
+				}
+				importBlock.WriteString(fmt.Sprintf("\t\"%s\"\n", cleanImp))
 			}
 		}
 
