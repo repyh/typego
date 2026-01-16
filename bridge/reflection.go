@@ -7,13 +7,39 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Binding represents a mapped Go struct in JS
+// Binding represents a Go struct that has been bound to the JavaScript runtime.
+// It stores the name under which the struct is accessible in JS and a reference
+// to the actual Go value.
 type Binding struct {
 	Name   string
 	Target interface{}
 }
 
-// BindStruct uses reflection to expose all exported methods and fields of a struct to the JS VM
+// BindStruct uses reflection to expose a Go struct to the JavaScript runtime.
+// All exported fields are made readable, and all exported methods are callable
+// from JavaScript.
+//
+// The struct is registered as a global object with the given name. Method calls
+// from JavaScript are automatically marshaled to the appropriate Go types.
+//
+// Example:
+//
+//	type Calculator struct {
+//	    LastResult float64
+//	}
+//
+//	func (c *Calculator) Add(a, b float64) float64 {
+//	    c.LastResult = a + b
+//	    return c.LastResult
+//	}
+//
+//	calc := &Calculator{}
+//	bridge.BindStruct(vm, "calc", calc)
+//	// In JS: calc.Add(1, 2) returns 3
+//	// In JS: calc.LastResult contains 3
+//
+// Type conversion is handled automatically for compatible types. If a JavaScript
+// value cannot be converted to the expected Go type, a TypeError is thrown.
 func BindStruct(vm *goja.Runtime, name string, s interface{}) error {
 	v := reflect.ValueOf(s)
 	t := reflect.TypeOf(s)

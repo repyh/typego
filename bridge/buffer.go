@@ -4,20 +4,33 @@ import (
 	"github.com/dop251/goja"
 )
 
-// ToArrayBuffer converts a Go byte slice to a JS ArrayBuffer
+// ToArrayBuffer converts a Go byte slice to a JavaScript ArrayBuffer.
+// The returned ArrayBuffer is a copy of the original data, so modifications
+// in JavaScript will not affect the Go slice.
+//
+// For shared memory scenarios where modifications should be visible to both
+// Go and JavaScript, use MapSharedBuffer instead.
 func ToArrayBuffer(vm *goja.Runtime, data []byte) goja.Value {
-	// Default Goja behavior creates a copy
 	return vm.ToValue(vm.NewArrayBuffer(data))
 }
 
-// MapSharedBuffer exposes a Go slice as a JS TypedArray
+// MapSharedBuffer exposes a Go byte slice as a global JavaScript TypedArray.
+// The backing memory is shared between Go and JavaScript, meaning modifications
+// from either side are immediately visible to the other.
+//
+// The buffer is registered as a global variable with the given name, accessible
+// as a Uint8Array in JavaScript. This is commonly used for inter-worker
+// communication and zero-copy data sharing.
+//
+// Example:
+//
+//	data := make([]byte, 1024)
+//	bridge.MapSharedBuffer(vm, "sharedBuffer", data)
+//	// In JS: sharedBuffer[0] = 42
+//	// In Go: data[0] == 42
 func MapSharedBuffer(vm *goja.Runtime, name string, data []byte) {
 	buf := vm.NewArrayBuffer(data)
-	// Create a view (Uint8Array)
 	view := vm.ToValue(vm.Get("Uint8Array")).ToObject(vm)
-
-	// Create new instance: new Uint8Array(buffer)
 	typedArray, _ := vm.New(view, vm.ToValue(buf))
-
 	_ = vm.GlobalObject().Set(name, typedArray)
 }
