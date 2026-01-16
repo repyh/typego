@@ -20,6 +20,8 @@ func EnableNodeCompat(vm *goja.Runtime) {
 			env.Set(parts[0], parts[1])
 		}
 	}
+	// Force Node libraries (like chalk) to detect color support
+	env.Set("FORCE_COLOR", "1")
 	proc.Set("env", env)
 
 	// process.platform
