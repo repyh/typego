@@ -63,12 +63,12 @@ declare module "go:*" {
 		}
 		defer fetcher.Cleanup()
 
-		// Collect all TypeScript files to scan
-		var filesToScan []string
+		// Collect all TypeScript files to scan (deduplicated)
+		fileSet := make(map[string]bool)
 		if len(args) > 0 {
 			// Explicit file provided
 			absPath, _ := filepath.Abs(args[0])
-			filesToScan = append(filesToScan, absPath)
+			fileSet[absPath] = true
 		} else {
 			// Find all .ts files in common locations
 			searchDirs := []string{".", "src", "lib"}
@@ -76,26 +76,16 @@ declare module "go:*" {
 				matches, _ := filepath.Glob(filepath.Join(dir, "*.ts"))
 				for _, m := range matches {
 					absPath, _ := filepath.Abs(m)
-					filesToScan = append(filesToScan, absPath)
-				}
-				// Also check subdirectories
-				subMatches, _ := filepath.Glob(filepath.Join(dir, "**", "*.ts"))
-				for _, m := range subMatches {
-					absPath, _ := filepath.Abs(m)
-					filesToScan = append(filesToScan, absPath)
+					fileSet[absPath] = true
 				}
 			}
 		}
 
 		// Collect unique Go imports from all files
 		goImports := make(map[string]bool)
-		for _, file := range filesToScan {
-			fmt.Printf("🔍 Scanning %s for imports...\n", file)
-			res, err := compiler.Compile(file, nil)
-			if err != nil {
-				fmt.Printf("Warning: Scan failed for %s: %v\n", file, err)
-				continue
-			}
+		for file := range fileSet {
+			fmt.Printf("🔍 Scanning %s...\n", filepath.Base(file))
+			res, _ := compiler.Compile(file, nil) // Ignore errors - expected during scan
 			if res != nil {
 				for _, imp := range res.Imports {
 					if len(imp) > 3 && imp[:3] == "go:" {
