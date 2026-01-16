@@ -94,6 +94,13 @@ go 1.23.6
 `
 		os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
 
+		// Point to local TypeGo source so we test current changes
+		cwd, _ := os.Getwd()
+		absCwd, _ := filepath.Abs(cwd)
+		replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh3/typego="+absCwd)
+		replaceCmd.Dir = tmpDir
+		replaceCmd.Run()
+
 		// Fetch all required typego packages
 		packages := []string{
 			"github.com/repyh3/typego/bridge",
@@ -103,7 +110,7 @@ go 1.23.6
 			"github.com/dop251/goja",
 		}
 		for _, pkg := range packages {
-			getCmd := exec.Command("go", "get", pkg+"@latest")
+			getCmd := exec.Command("go", "get", pkg) // Removed @latest to allow replacement
 			getCmd.Dir = tmpDir
 			getCmd.Env = append(os.Environ(), "GOPROXY=direct")
 			getCmd.Run()
