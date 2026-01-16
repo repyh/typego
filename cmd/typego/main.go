@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var memoryLimit uint64
+
 var rootCmd = &cobra.Command{
 	Use:   "typego",
 	Short: "TypeGo is a TypeScript runtime for Go",
@@ -16,6 +18,10 @@ developers to harness Go's concurrency and memory efficiency while writing TypeS
 		// Default action if no subcommand is provided
 		cmd.Help()
 	},
+}
+
+func init() {
+	rootCmd.PersistentFlags().Uint64VarP(&memoryLimit, "memory-limit", "M", 128, "Memory limit for the JS engine in MB")
 }
 
 func Execute() {

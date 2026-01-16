@@ -103,7 +103,7 @@ var buildCmd = &cobra.Command{
 			}
 		}
 
-		shimContent := fmt.Sprintf(shimTemplate, importBlock.String(), fmt.Sprintf("%q", res.JS), bindBlock)
+		shimContent := fmt.Sprintf(shimTemplate, importBlock.String(), fmt.Sprintf("%q", res.JS), bindBlock, memoryLimit*1024*1024)
 
 		shimPath := filepath.Join(tmpDir, "main.go")
 		if err := os.WriteFile(shimPath, []byte(shimContent), 0644); err != nil {
@@ -177,7 +177,7 @@ import (
 	"fmt"
 	"os"
 
-	%s
+	%[1]s
 
 	"github.com/dop251/goja"
 	"github.com/repyh3/typego/bridge"
@@ -185,7 +185,7 @@ import (
 	"github.com/repyh3/typego/engine"
 )
 
-const jsBundle = %s
+const jsBundle = %[2]s
 
 type NativeTools struct {
 	StartTime string
@@ -196,7 +196,7 @@ func (n *NativeTools) GetRuntimeInfo() string {
 }
 
 func main() {
-	eng := engine.NewEngine(128*1024*1024, nil)
+	eng := engine.NewEngine(%[4]d, nil)
 
 	// Initialize Shared Buffer
 	cliBuffer := make([]byte, 1024)
@@ -217,7 +217,7 @@ func main() {
 	polyfills.EnableAll(eng.VM, eng.EventLoop)
 
 	// Hyper-Linker Bindings (Generated)
-	%s
+	%[3]s
 
 	// Run on EventLoop
 	eng.EventLoop.RunOnLoop(func() {

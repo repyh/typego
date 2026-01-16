@@ -81,7 +81,7 @@ var runCmd = &cobra.Command{
 		}
 
 		// Reuse shimTemplate from build.go
-		shimContent := fmt.Sprintf(shimTemplate, importBlock.String(), fmt.Sprintf("%q", res.JS), bindBlock)
+		shimContent := fmt.Sprintf(shimTemplate, importBlock.String(), fmt.Sprintf("%q", res.JS), bindBlock, memoryLimit*1024*1024)
 		if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(shimContent), 0644); err != nil {
 			fmt.Printf("Error writing shim: %v\n", err)
 			os.Exit(1)
@@ -94,6 +94,13 @@ go 1.23.6
 `
 		os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
 
+		// Point to local TypeGo source so we test current changes
+		cwd, _ := os.Getwd()
+		absCwd, _ := filepath.Abs(cwd)
+		replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh3/typego="+absCwd)
+		replaceCmd.Dir = tmpDir
+		replaceCmd.Run()
+
 		// Fetch all required typego packages
 		packages := []string{
 			"github.com/repyh3/typego/bridge",
@@ -103,7 +110,7 @@ go 1.23.6
 			"github.com/dop251/goja",
 		}
 		for _, pkg := range packages {
-			getCmd := exec.Command("go", "get", pkg+"@latest")
+			getCmd := exec.Command("go", "get", pkg) // Removed @latest to allow replacement
 			getCmd.Dir = tmpDir
 			getCmd.Env = append(os.Environ(), "GOPROXY=direct")
 			getCmd.Run()
