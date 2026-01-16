@@ -1,0 +1,87 @@
+package engine
+
+import (
+	"fmt"
+	"sync"
+
+	"github.com/dop251/goja"
+	"github.com/repyh3/typego/bridge"
+	"github.com/repyh3/typego/compiler"
+)
+
+type WorkerInstance struct {
+	vm     *goja.Runtime
+	engine *Engine
+	inbox  chan interface{}
+	stop   chan struct{}
+	wg     sync.WaitGroup
+}
+
+func (w *WorkerInstance) PostMessage(msg goja.Value) {
+	data := msg.Export()
+	w.inbox <- data
+}
+
+func (w *WorkerInstance) Terminate() {
+	close(w.stop)
+}
+
+func (e *Engine) SpawnWorker(scriptPath string, onMessage func(goja.Value)) (bridge.WorkerHandle, error) {
+	res, err := compiler.Compile(scriptPath)
+	if err != nil {
+		return nil, fmt.Errorf("compile error: %w", err)
+	}
+
+	workerEng := NewEngine(e.MemoryLimit, e.MemoryFactory)
+
+	inbox := make(chan interface{}, 100)
+	stop := make(chan struct{})
+
+	w := &WorkerInstance{
+		vm:     workerEng.VM,
+		engine: workerEng,
+		inbox:  inbox,
+		stop:   stop,
+	}
+
+	bridge.RegisterWorkerSelf(workerEng.VM, func(msg goja.Value) {
+		data := msg.Export()
+		e.EventLoop.RunOnLoop(func() {
+			val := e.VM.ToValue(data)
+			onMessage(val)
+		})
+	})
+
+	go func() {
+		_, err := workerEng.Run(res.JS)
+		if err != nil {
+			fmt.Printf("Worker Error [%s]: %v\n", scriptPath, err)
+		}
+
+		workerEng.EventLoop.WGAdd(1)
+		workerEng.EventLoop.Start()
+	}()
+
+	go func() {
+		for {
+			select {
+			case msg := <-inbox:
+				workerEng.EventLoop.RunOnLoop(func() {
+					val := workerEng.VM.ToValue(msg)
+					if onMsg := workerEng.VM.GlobalObject().Get("onmessage"); onMsg != nil {
+						if fn, ok := goja.AssertFunction(onMsg); ok {
+							event := workerEng.VM.NewObject()
+							event.Set("data", val)
+							_, _ = fn(workerEng.VM.GlobalObject(), event)
+						}
+					}
+				})
+			case <-stop:
+				workerEng.EventLoop.Stop()
+				return
+			}
+		}
+	}()
+
+	return w, nil
+}

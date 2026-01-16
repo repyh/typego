@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "go/*": ["../go.d.ts"]
+    },
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "../go.d.ts"]
+}
