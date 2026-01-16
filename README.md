@@ -6,11 +6,11 @@ TypeGo is a TypeScript runtime built on Go. It lets you write TypeScript code th
 
 Backend development usually means picking a side: TypeScript for developer experience, or Go for operational simplicity. TypeGo lets you have both.
 
-### Actual Parallelism
+### 🚀 Actual Parallelism
 
 Node.js runs on a single thread. If you have a CPU-heavy task, it blocks everything else. TypeGo uses Go's goroutines under the hood, so you can spin up workers that run truly in parallel without freezing your main thread.
 
-### 📦  One Binary, Zero Drama
+### 📦 One Binary, Zero Drama
 
 No `node_modules` folder. No Docker multi-stage builds. No runtime version mismatches. TypeGo compiles your TypeScript, your dependencies, and the Go runtime into a single executable. Deploy by copying one file.
 
