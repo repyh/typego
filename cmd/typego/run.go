@@ -88,15 +88,13 @@ var runCmd = &cobra.Command{
 		}
 
 		// Generate go.mod
-		currWd, _ := os.Getwd()
-		goModContent := fmt.Sprintf(`module typego_run
+		goModContent := `module typego_run
 
 go 1.23.6
 
-require github.com/repyh3/typego v0.0.0
-
-replace github.com/repyh3/typego => %s
-`, filepath.ToSlash(currWd))
+require github.com/repyh3/typego v0.0.0-20260116052821-59a9d21c7be3
+`
+		os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(shimContent), 0644)
 		os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
 
 		// Tidy

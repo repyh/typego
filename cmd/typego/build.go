@@ -112,15 +112,12 @@ var buildCmd = &cobra.Command{
 		}
 
 		// 4. Generate go.mod for the shim
-		currWd, _ := os.Getwd()
-		goModContent := fmt.Sprintf(`module typego_app
+		goModContent := `module typego_app
 
 go 1.23.6
 
-require github.com/repyh3/typego v0.0.0
-
-replace github.com/repyh3/typego => %s
-`, filepath.ToSlash(currWd))
+require github.com/repyh3/typego v0.0.0-20260116052821-59a9d21c7be3
+`
 
 		if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644); err != nil {
 			fmt.Printf("Error writing go.mod: %v\n", err)
