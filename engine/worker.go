@@ -27,7 +27,7 @@ func (w *WorkerInstance) Terminate() {
 }
 
 func (e *Engine) SpawnWorker(scriptPath string, onMessage func(goja.Value)) (bridge.WorkerHandle, error) {
-	res, err := compiler.Compile(scriptPath)
+	res, err := compiler.Compile(scriptPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("compile error: %w", err)
 	}

@@ -9,9 +9,12 @@ import (
 type Result struct {
 	JS        string
 	SourceMap string
+	Imports   []string
 }
 
-func Compile(entryPoint string) (*Result, error) {
+func Compile(entryPoint string, virtualModules map[string]string) (*Result, error) {
+	var collectedImports []string
+
 	result := api.Build(api.BuildOptions{
 		EntryPoints: []string{entryPoint},
 		Bundle:      true,
@@ -24,8 +27,24 @@ func Compile(entryPoint string) (*Result, error) {
 			{
 				Name: "typego-virtual",
 				Setup: func(build api.PluginBuild) {
+					build.OnResolve(api.OnResolveOptions{Filter: `^go:.*`}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
+						// Capture the import
+						collectedImports = append(collectedImports, args.Path)
+						return api.OnResolveResult{Path: args.Path, Namespace: "typego-hyperlink"}, nil
+					})
 					build.OnResolve(api.OnResolveOptions{Filter: `^go/.*`}, func(args api.OnResolveArgs) (api.OnResolveResult, error) {
 						return api.OnResolveResult{Path: args.Path, Namespace: "typego-internal"}, nil
+					})
+					build.OnLoad(api.OnLoadOptions{Filter: `.*`, Namespace: "typego-hyperlink"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
+						// Check if we have dynamic content for this module
+						if content, ok := virtualModules[args.Path]; ok {
+							return api.OnLoadResult{Contents: &content, Loader: api.LoaderTS}, nil
+						}
+
+						// Default/Fallback (used during scan)
+						// We try to be permissive for the scanner by returning a Proxy or dummy
+						content := "const p = new Proxy({}, { get: () => () => {} }); export const Println = p; export const Printf = p; export default p;"
+						return api.OnLoadResult{Contents: &content, Loader: api.LoaderTS}, nil
 					})
 					build.OnLoad(api.OnLoadOptions{Filter: `.*`, Namespace: "typego-internal"}, func(args api.OnLoadArgs) (api.OnLoadResult, error) {
 						var content string
@@ -50,11 +69,14 @@ func Compile(entryPoint string) (*Result, error) {
 		},
 	})
 
-	if len(result.Errors) > 0 {
-		return nil, fmt.Errorf("compilation failed: %v", result.Errors[0].Text)
+	res := &Result{
+		Imports: collectedImports,
 	}
 
-	res := &Result{}
+	if len(result.Errors) > 0 {
+		return res, fmt.Errorf("compilation failed: %v", result.Errors[0].Text)
+	}
+
 	for _, file := range result.OutputFiles {
 		if file.Path == "<stdout>.js" || len(result.OutputFiles) == 1 {
 			res.JS = string(file.Contents)

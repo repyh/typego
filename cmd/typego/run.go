@@ -28,7 +28,7 @@ var runCmd = &cobra.Command{
 		filename := args[0]
 		absPath, _ := filepath.Abs(filename)
 
-		res, err := compiler.Compile(absPath)
+		res, err := compiler.Compile(absPath, nil)
 		if err != nil {
 			fmt.Printf("Build Error: %v\n", err)
 			os.Exit(1)

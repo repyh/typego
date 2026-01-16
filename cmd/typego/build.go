@@ -6,7 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"strings"
+
 	"github.com/repyh3/typego/compiler"
+	"github.com/repyh3/typego/internal/linker"
 	"github.com/spf13/cobra"
 )
 
@@ -22,11 +25,10 @@ var buildCmd = &cobra.Command{
 		absPath, _ := filepath.Abs(filename)
 
 		fmt.Printf("📦 Building %s...\n", absPath)
-		res, err := compiler.Compile(absPath)
-		if err != nil {
-			fmt.Printf("Build Error: %v\n", err)
-			os.Exit(1)
-		}
+
+		// PASS 1: Scan for imports
+		// We ignore errors here because the virtual modules are not yet populated
+		res, _ := compiler.Compile(absPath, nil)
 
 		// 2. Prepare Temp Directory
 		tmpDir := ".typego_build_tmp"
@@ -36,9 +38,67 @@ var buildCmd = &cobra.Command{
 		}
 		defer os.RemoveAll(tmpDir) // Cleanup
 
-		// 3. Generate Shim (main.go)
-		// We embed the JS code directly into the Go binary
-		shimContent := fmt.Sprintf(shimTemplate, fmt.Sprintf("%q", res.JS))
+		// Initialize Fetcher
+		fetcher, err := linker.NewFetcher()
+		if err != nil {
+			fmt.Printf("Failed to init fetcher: %v\n", err)
+			os.Exit(1)
+		}
+		defer fetcher.Cleanup()
+
+		// 3. Inspect Imports & Generate Virtual Modules
+		virtualModules := make(map[string]string)
+		var bindBlock string
+
+		if res != nil {
+			for _, imp := range res.Imports {
+				if len(imp) > 3 && imp[:3] == "go:" {
+					cleanImp := imp[3:]
+
+					fmt.Printf("🔍 Inspecting %s...\n", cleanImp)
+					if err := fetcher.Get(cleanImp); err != nil {
+						// Fallback: It might be stdlib, ignore error for now
+					}
+
+					info, err := linker.Inspect(cleanImp, fetcher.TempDir)
+					if err != nil {
+						fmt.Printf("Warning: Could not inspect %s: %v\n", cleanImp, err)
+						continue
+					}
+
+					// Generate Shim Binding Code
+					bindBlock += linker.GenerateShim(info, "pkg_"+info.Name)
+
+					// Generate Virtual Module Content (Exports)
+					var vmContent strings.Builder
+					for _, fn := range info.Exports {
+						// e.g. export const Red = (globalThis as any)._go_hyper_color.Red;
+						// Note: variable name matches GenerateShim output: "_go_hyper_" + info.Name
+						vmContent.WriteString(fmt.Sprintf("export const %s = (globalThis as any)._go_hyper_%s.%s;\n", fn.Name, info.Name, fn.Name))
+					}
+
+					virtualModules[imp] = vmContent.String()
+				}
+			}
+		}
+
+		// PASS 2: Compile with Virtual Modules (Strict)
+		fmt.Println("🔨 Compiling binary (Pass 2)...")
+		res, err = compiler.Compile(absPath, virtualModules)
+		if err != nil {
+			fmt.Printf("Build Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Generate Import Block for Shim
+		var importBlock strings.Builder
+		for _, imp := range res.Imports {
+			if len(imp) > 3 && imp[:3] == "go:" {
+				importBlock.WriteString(fmt.Sprintf("\t\"%s\"\n", imp[3:]))
+			}
+		}
+
+		shimContent := fmt.Sprintf(shimTemplate, importBlock.String(), fmt.Sprintf("%q", res.JS), bindBlock)
 
 		shimPath := filepath.Join(tmpDir, "main.go")
 		if err := os.WriteFile(shimPath, []byte(shimContent), 0644); err != nil {
@@ -47,15 +107,10 @@ var buildCmd = &cobra.Command{
 		}
 
 		// 4. Generate go.mod for the shim
-		// We assume we are in the TypeGo repo, so we can point to local source
-		// In a real release, this would point to the github version
 		currWd, _ := os.Getwd()
-		// Calculate relative path from tmpDir back to root (usually just "..")
-		// But let's use absolute path for safety in the replace directive
-
 		goModContent := fmt.Sprintf(`module typego_app
 
-go 1.21
+go 1.23.6
 
 require github.com/repyh3/typego v0.0.0
 
@@ -106,6 +161,8 @@ import (
 	"fmt"
 	"os"
 
+	%s
+
 	"github.com/dop251/goja"
 	"github.com/repyh3/typego/bridge"
 	"github.com/repyh3/typego/engine"
@@ -132,11 +189,14 @@ func main() {
 	tools := &NativeTools{StartTime: "2026-01-16"}
 	_ = bridge.BindStruct(eng.VM, "native", tools)
 
+	// Hyper-Linker Bindings (Generated)
+	%s
+
 	// Run on EventLoop
 	eng.EventLoop.RunOnLoop(func() {
 		val, err := eng.Run(jsBundle)
 		if err != nil {
-			fmt.Printf("Runtime Error: %v\n", err)
+			fmt.Printf("Runtime Error: %%v\n", err)
 			os.Exit(1)
 		}
 
