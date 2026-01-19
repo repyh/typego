@@ -6,14 +6,23 @@ import (
 )
 
 // GenerateShim creates the Go code to bind the package to the VM.
+// Binds both top-level functions and exported structs.
 func GenerateShim(info *PackageInfo, variableName string) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("\n\t// Bind %s\n", info.ImportPath))
 	sb.WriteString(fmt.Sprintf("\t%s := eng.VM.NewObject()\n", variableName))
 
+	// Bind top-level functions
 	for _, fn := range info.Exports {
 		sb.WriteString(fmt.Sprintf("\t%s.Set(%q, %s.%s)\n", variableName, fn.Name, info.Name, fn.Name))
+	}
+
+	// Bind struct constructors (factory functions)
+	for _, st := range info.Structs {
+		sb.WriteString(fmt.Sprintf("\t// Struct: %s\n", st.Name))
+		sb.WriteString(fmt.Sprintf("\t%s.Set(\"New%s\", func() interface{} { return &%s.%s{} })\n",
+			variableName, st.Name, info.Name, st.Name))
 	}
 
 	sb.WriteString(fmt.Sprintf("\teng.VM.Set(%q, %s)\n", "_go_hyper_"+info.Name, variableName))
