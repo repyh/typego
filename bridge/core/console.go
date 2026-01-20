@@ -35,7 +35,7 @@ func (c *Console) Error(call goja.FunctionCall) goja.Value {
 func RegisterConsole(vm *goja.Runtime) {
 	c := &Console{}
 	obj := vm.NewObject()
-	obj.Set("log", c.Log)
-	obj.Set("error", c.Error)
-	vm.Set("console", obj)
+	_ = obj.Set("log", c.Log)
+	_ = obj.Set("error", c.Error)
+	_ = vm.Set("console", obj)
 }

@@ -55,10 +55,10 @@ func (m *Module) GetStats(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 		runtime.ReadMemStats(&ms)
 
 		obj := vm.NewObject()
-		obj.Set("alloc", ms.Alloc)
-		obj.Set("totalAlloc", ms.TotalAlloc)
-		obj.Set("sys", ms.Sys)
-		obj.Set("numGC", ms.NumGC)
+		_ = obj.Set("alloc", ms.Alloc)
+		_ = obj.Set("totalAlloc", ms.TotalAlloc)
+		_ = obj.Set("sys", ms.Sys)
+		_ = obj.Set("numGC", ms.NumGC)
 
 		return obj
 	}
@@ -72,9 +72,9 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop, f *Factory) {
 	m := &Module{Factory: f}
 
 	obj := vm.NewObject()
-	obj.Set("stats", m.GetStats(vm))
+	_ = obj.Set("stats", m.GetStats(vm))
 
-	obj.Set("makeShared", func(call goja.FunctionCall) goja.Value {
+	_ = obj.Set("makeShared", func(call goja.FunctionCall) goja.Value {
 		name := call.Argument(0).String()
 		size := int(call.Argument(1).ToInteger())
 
@@ -89,19 +89,19 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop, f *Factory) {
 		tArray, _ := vm.New(u8, vm.ToValue(buf))
 
 		res := vm.NewObject()
-		res.Set("buffer", tArray)
+		_ = res.Set("buffer", tArray)
 		// Reuse the production-ready BindMutex from sync module
-		res.Set("mutex", modulesync.BindMutex(vm, &segment.Mu, el))
+		_ = res.Set("mutex", modulesync.BindMutex(vm, &segment.Mu, el))
 
 		return res
 	})
 
 	// Ptr factory for referencing values
-	obj.Set("ptr", func(call goja.FunctionCall) goja.Value {
+	_ = obj.Set("ptr", func(call goja.FunctionCall) goja.Value {
 		// Just a simple wrapper for now, can be expanded
 		val := call.Argument(0)
 		return val
 	})
 
-	vm.Set("__typego_memory__", obj)
+	_ = vm.Set("__typego_memory__", obj)
 }

@@ -9,7 +9,7 @@ import (
 
 // EnableTimers injects setTimeout and setInterval globals
 func EnableTimers(vm *goja.Runtime, el *eventloop.EventLoop) {
-	vm.Set("setTimeout", func(call goja.FunctionCall) goja.Value {
+	_ = vm.Set("setTimeout", func(call goja.FunctionCall) goja.Value {
 		fn, _ := goja.AssertFunction(call.Argument(0))
 		ms := call.Argument(1).ToInteger()
 		el.WGAdd(1)
@@ -23,7 +23,7 @@ func EnableTimers(vm *goja.Runtime, el *eventloop.EventLoop) {
 		return goja.Undefined()
 	})
 
-	vm.Set("setInterval", func(call goja.FunctionCall) goja.Value {
+	_ = vm.Set("setInterval", func(call goja.FunctionCall) goja.Value {
 		fn, _ := goja.AssertFunction(call.Argument(0))
 		ms := call.Argument(1).ToInteger()
 
@@ -46,11 +46,11 @@ func EnableTimers(vm *goja.Runtime, el *eventloop.EventLoop) {
 
 		// Return a simple ID object for clearInterval
 		id := vm.NewObject()
-		id.Set("__stop__", stop)
+		_ = id.Set("__stop__", stop)
 		return id
 	})
 
-	vm.Set("clearInterval", func(call goja.FunctionCall) goja.Value {
+	_ = vm.Set("clearInterval", func(call goja.FunctionCall) goja.Value {
 		obj := call.Argument(0).ToObject(vm)
 		if obj != nil {
 			if ch := obj.Get("__stop__"); ch != nil {

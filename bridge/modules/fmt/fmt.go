@@ -52,8 +52,8 @@ func Register(vm *goja.Runtime) {
 	f := &Module{}
 
 	obj := vm.NewObject()
-	obj.Set("Println", f.Println)
-	obj.Set("Printf", f.Printf)
+	_ = obj.Set("Println", f.Println)
+	_ = obj.Set("Printf", f.Printf)
 
-	vm.Set("__go_fmt__", obj)
+	_ = vm.Set("__go_fmt__", obj)
 }

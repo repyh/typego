@@ -61,9 +61,9 @@ func (h *Module) Get(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 		}
 
 		res := vm.NewObject()
-		res.Set("Status", resp.Status)
-		res.Set("StatusCode", resp.StatusCode)
-		res.Set("Body", string(body))
+		_ = res.Set("Status", resp.Status)
+		_ = res.Set("StatusCode", resp.StatusCode)
+		_ = res.Set("Body", string(body))
 
 		return res
 	}
@@ -74,9 +74,9 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 	h := &Module{}
 
 	obj := vm.NewObject()
-	obj.Set("Get", h.Get(vm))
+	_ = obj.Set("Get", h.Get(vm))
 
-	obj.Set("Fetch", func(call goja.FunctionCall) goja.Value {
+	_ = obj.Set("Fetch", func(call goja.FunctionCall) goja.Value {
 		url := call.Argument(0).String()
 		p, resolve, reject := el.CreatePromise()
 
@@ -104,9 +104,9 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 				}
 
 				res := vm.NewObject()
-				res.Set("Status", resp.Status)
-				res.Set("StatusCode", resp.StatusCode)
-				res.Set("Body", string(body))
+				_ = res.Set("Status", resp.Status)
+				_ = res.Set("StatusCode", resp.StatusCode)
+				_ = res.Set("Body", string(body))
 				resolve(res)
 			})
 		}()
@@ -114,5 +114,5 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 		return p
 	})
 
-	vm.Set("__go_http__", obj)
+	_ = vm.Set("__go_http__", obj)
 }

@@ -111,8 +111,8 @@ func Register(vm *goja.Runtime) {
 	m := &Module{Root: absRoot}
 
 	obj := vm.NewObject()
-	obj.Set("WriteFile", m.WriteFile(vm))
-	obj.Set("ReadFile", m.ReadFile(vm))
+	_ = obj.Set("WriteFile", m.WriteFile(vm))
+	_ = obj.Set("ReadFile", m.ReadFile(vm))
 
-	vm.Set("__go_os__", obj)
+	_ = vm.Set("__go_os__", obj)
 }

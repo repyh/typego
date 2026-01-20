@@ -79,17 +79,17 @@ func (m *Module) Sleep(call goja.FunctionCall) goja.Value {
 func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 	m := &Module{el: el}
 	obj := vm.NewObject()
-	obj.Set("Spawn", m.Spawn)
-	obj.Set("Sleep", m.Sleep)
+	_ = obj.Set("Spawn", m.Spawn)
+	_ = obj.Set("Sleep", m.Sleep)
 
 	vm.Set("Chan", func(call goja.ConstructorCall) *goja.Object {
 		ch := make(chan goja.Value, 100)
 		res := vm.NewObject()
-		res.Set("send", func(c goja.FunctionCall) goja.Value {
+		_ = res.Set("send", func(c goja.FunctionCall) goja.Value {
 			ch <- c.Argument(0)
 			return goja.Undefined()
 		})
-		res.Set("recv", func(c goja.FunctionCall) goja.Value {
+		_ = res.Set("recv", func(c goja.FunctionCall) goja.Value {
 			p, resolve, _ := el.CreatePromise()
 			go func() { resolve(<-ch) }()
 			return p
@@ -97,7 +97,7 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 		return res
 	})
 
-	vm.Set("__go_sync__", obj)
+	_ = vm.Set("__go_sync__", obj)
 }
 
 // AsyncMutex wraps a sync.RWMutex with async-friendly locking operations.

@@ -29,28 +29,28 @@ func EnableProcess(vm *goja.Runtime) {
 			upperKey := strings.ToUpper(key)
 			// Allow whitelisted vars or anything prefixed with TYPEGO_
 			if whitelist[upperKey] || strings.HasPrefix(upperKey, "TYPEGO_") {
-				env.Set(key, parts[1])
+				_ = env.Set(key, parts[1])
 			}
 		}
 	}
 	// Force color support for libraries like chalk
-	env.Set("FORCE_COLOR", "1")
-	proc.Set("env", env)
+	_ = env.Set("FORCE_COLOR", "1")
+	_ = proc.Set("env", env)
 
 	// process.platform
-	proc.Set("platform", runtime.GOOS)
+	_ = proc.Set("platform", runtime.GOOS)
 
 	// process.cwd()
-	proc.Set("cwd", func(call goja.FunctionCall) goja.Value {
+	_ = proc.Set("cwd", func(call goja.FunctionCall) goja.Value {
 		wd, _ := os.Getwd()
 		return vm.ToValue(wd)
 	})
 
 	// process.argv
-	proc.Set("argv", os.Args)
+	_ = proc.Set("argv", os.Args)
 
 	// process.version
-	proc.Set("version", runtime.Version())
+	_ = proc.Set("version", runtime.Version())
 
-	vm.Set("process", proc)
+	_ = vm.Set("process", proc)
 }
