@@ -2,14 +2,16 @@
 
 # TypeGo
 
-A TypeScript runtime built on Go with true parallelism, shared memory, and single-binary deployment.
+typego is an embedded TypeScript runtime for Go. It lets you script Go applications with TS without the overhead of Node.js or the boilerplate of manual FFI bindings.
 
-[Getting Started](#getting-started) • [Features](#features) • [Examples](#examples) • [License](#license)
+[Getting Started](#getting-started) • [Features](#features) • [Examples](#examples) • [Optimization](OPTIMIZATION.md) • [License](#license)
 
 </div>
 
 > [!WARNING]
 > **Proof of Concept**: This project is experimental and not intended for production use. Maintenance is sporadic. You are encouraged to fork and extend!
+
+Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS engine (Goja) directly inside your Go process. You can import Go packages as if they were native TS modules using the go: prefix, allowing for zero-copy data sharing and direct access to Go’s standard library.
 
 ## Features
 
@@ -115,6 +117,11 @@ Spawn(async () => {
 | CLI tools with single binary | Data science (use Python) |
 | TypeScript team wanting Go perf | Systems programming (use Rust/Go) |
 | Serverless/edge (small binary) | Mobile apps |
+
+## Performance
+
+TypeGo is optimized for high-throughput I/O and true parallelism. For a detailed breakdown of the execution model, interop overhead, and optimization strategies, see **[OPTIMIZATION.md](OPTIMIZATION.md)**.
+
 
 ## Runtime Comparison
 
