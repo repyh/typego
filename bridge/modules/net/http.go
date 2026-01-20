@@ -72,9 +72,60 @@ func (h *Module) Get(vm *goja.Runtime) func(goja.FunctionCall) goja.Value {
 // Register injects the http functions into the runtime
 func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 	h := &Module{}
+	server := NewServer(vm, el)
 
 	obj := vm.NewObject()
 	_ = obj.Set("Get", h.Get(vm))
+
+	// HTTP client with custom headers
+	_ = obj.Set("Post", func(call goja.FunctionCall) goja.Value {
+		url := call.Argument(0).String()
+		body := call.Argument(1).String()
+		contentType := "application/json"
+		if len(call.Arguments) > 2 {
+			contentType = call.Argument(2).String()
+		}
+
+		p, resolve, reject := el.CreatePromise()
+
+		go func() {
+			req, err := http.NewRequest("POST", url, io.NopCloser(
+				io.LimitReader(
+					&stringReader{s: body, i: 0},
+					int64(len(body)),
+				),
+			))
+			if err != nil {
+				el.RunOnLoop(func() {
+					reject(vm.NewGoError(err))
+				})
+				return
+			}
+			req.Header.Set("Content-Type", contentType)
+
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				el.RunOnLoop(func() {
+					reject(vm.NewGoError(err))
+				})
+				return
+			}
+			defer resp.Body.Close()
+
+			limit := int64(maxResponseBodySize)
+			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, limit))
+
+			el.RunOnLoop(func() {
+				res := vm.NewObject()
+				_ = res.Set("Status", resp.Status)
+				_ = res.Set("StatusCode", resp.StatusCode)
+				_ = res.Set("Body", string(respBody))
+				resolve(res)
+			})
+		}()
+
+		return p
+	})
 
 	_ = obj.Set("Fetch", func(call goja.FunctionCall) goja.Value {
 		url := call.Argument(0).String()
@@ -114,5 +165,47 @@ func Register(vm *goja.Runtime, el *eventloop.EventLoop) {
 		return p
 	})
 
+	// HTTP Server bindings
+	_ = obj.Set("ListenAndServe", func(call goja.FunctionCall) goja.Value {
+		addr := call.Argument(0).String()
+		handler, ok := goja.AssertFunction(call.Argument(1))
+		if !ok {
+			panic(vm.NewTypeError("ListenAndServe requires a handler function"))
+		}
+
+		if err := server.ListenAndServe(addr, handler); err != nil {
+			panic(vm.NewGoError(err))
+		}
+
+		// Return the server for later shutdown
+		srvObj := vm.NewObject()
+		_ = srvObj.Set("close", func(call goja.FunctionCall) goja.Value {
+			timeout := 5 * time.Second
+			if len(call.Arguments) > 0 {
+				timeout = time.Duration(call.Argument(0).ToInteger()) * time.Millisecond
+			}
+			if err := server.Close(timeout); err != nil {
+				panic(vm.NewGoError(err))
+			}
+			return goja.Undefined()
+		})
+		return srvObj
+	})
+
 	_ = vm.Set("__go_http__", obj)
+}
+
+// stringReader implements io.Reader for a string
+type stringReader struct {
+	s string
+	i int
+}
+
+func (r *stringReader) Read(b []byte) (n int, err error) {
+	if r.i >= len(r.s) {
+		return 0, io.EOF
+	}
+	n = copy(b, r.s[r.i:])
+	r.i += n
+	return
 }
