@@ -1,6 +1,6 @@
 module github.com/repyh3/typego
 
-go 1.25.0
+go 1.24.0
 
 require (
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
