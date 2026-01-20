@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.3.1] - 2026-01-21
+
+### Fixed
+- Fixed internal syntax error in `typego:worker` type definitions (`worker.d.ts`).
+- Decentralized `go:crypto` types to ensure correct linking and type generation.
+- Removed unreliable consumer simulation CI workflow.
+
 ## [v1.3.0] - 2026-01-20
 
 ### Added
