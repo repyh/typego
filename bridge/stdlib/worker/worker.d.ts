@@ -7,6 +7,6 @@ declare module "typego:worker" {
     }
     export var Worker: {
         new(scriptPath: string): Worker;
-    };
+    }
 }
 // END: typego:worker
