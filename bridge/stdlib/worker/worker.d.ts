@@ -5,6 +5,6 @@ declare module "typego:worker" {
         postMessage(msg: any): void;
         terminate(): void;
         onmessage: (msg: { data: any }) => void;
-    };
+    }
 }
 // END: typego:worker
