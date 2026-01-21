@@ -106,6 +106,7 @@ func bindMethods(vm *goja.Runtime, obj *goja.Object, v reflect.Value, visited ma
 
 	tPtr := vPtr.Type()
 
+	// @optimized: Use cached method metadata to avoid repeated reflection overhead (NumMethod, IsExported).
 	var methods []methodInfo
 	if cached, ok := typeMethodCache.Load(tPtr); ok {
 		methods = cached.([]methodInfo)
@@ -163,6 +164,7 @@ func createMethodWrapper(vm *goja.Runtime, methodVal reflect.Value, methodName s
 			return jsVal
 		}
 
+		// @optimized: Use NewArray with variadic args instead of loop+Set for return values.
 		retVals := make([]interface{}, len(results))
 		for i, r := range results {
 			jsVal, _ := bindValue(vm, r, visited)
@@ -237,6 +239,7 @@ func wrapJSCallback(vm *goja.Runtime, callable goja.Callable, goType reflect.Typ
 }
 
 func bindSlice(vm *goja.Runtime, v reflect.Value, visited map[uintptr]goja.Value) (goja.Value, error) {
+	// @optimized: Pre-allocate slice and use NewArray(vals...) to avoid repeated Set calls.
 	l := v.Len()
 	vals := make([]interface{}, l)
 	for i := 0; i < l; i++ {
@@ -253,6 +256,7 @@ func bindMap(vm *goja.Runtime, v reflect.Value, visited map[uintptr]goja.Value) 
 	obj := vm.NewObject()
 	for _, key := range v.MapKeys() {
 		var keyStr string
+		// @optimized: Avoid Sprintf if key is already a string.
 		if key.Kind() == reflect.String {
 			keyStr = key.String()
 		} else {
