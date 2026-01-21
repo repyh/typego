@@ -29,6 +29,8 @@ func init() {
 	RootCmd.AddCommand(pkg.ListCmd)
 	RootCmd.AddCommand(pkg.InstallCmd)
 	RootCmd.AddCommand(pkg.CleanCmd)
+	RootCmd.AddCommand(pkg.UpdateCmd)
+	RootCmd.AddCommand(pkg.OutdatedCmd)
 }
 
 func Execute() {
