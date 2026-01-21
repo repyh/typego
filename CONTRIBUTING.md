@@ -62,18 +62,27 @@ We use [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## Project Structure
 
-| Directory | Purpose |
-| :--- | :--- |
-| `cmd/typego` | The CLI entry point (`main`, `run`, `build`). |
-| `engine/` | Core Goja runtime wrapper and EventLoop. |
-| `bridge/` | Bindings between Go and JS. |
-| `compiler/` | ESBuild wrapper containing the **Cache** logic. |
-| `tests/integration/` | Verifies `bridge` modules function correctly in JS. |
-| `tests/e2e/` | Verifies the CLI binary compiles user apps correctly. |
+```text
+typego/
+├── bridge/          # Native bindings between Go and JavaScript
+├── cmd/typego/      # CLI entry point (Cobra root)
+├── compiler/        # ESBuild wrapper for bundling and caching
+├── engine/          # Core Goja runtime wrapper
+├── eventloop/       # Asynchronous execution loop
+│
+├── internal/
+│   ├── ecosystem/   # Package ecosystem: Installer, Resolver, Manifests
+│   └── linker/      # Smarter Type Linker: Recursive discovery, JIT inspection
+│
+├── pkg/cli/         # Modular command implementations: run, build, pkg/*
+│
+└── tests/
+    ├── integration/ # Integrity checks for stdlib bindings
+    └── e2e/         # Final verification of CLI and build pipelines
+```
 
 ---
 
 ## Need Help?
 If you're unsure about an implementation detail:
-1. Check `TESTING_STRATEGY.md` for architectural context.
-2. Open an Issue with the label `question`.
+1. Open an Issue with the label `question`.
