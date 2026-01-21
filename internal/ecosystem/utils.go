@@ -111,3 +111,23 @@ func VerifyChecksum(cwd string) bool {
 
 	return string(saved) == current
 }
+
+// FindRepoRoot attempts to find the root of the typego repository by walking up from startDir
+func FindRepoRoot(startDir string) (string, bool) {
+	curr := startDir
+	for {
+		goModPath := filepath.Join(curr, "go.mod")
+		if data, err := os.ReadFile(goModPath); err == nil {
+			if strings.Contains(string(data), "module github.com/repyh/typego") {
+				return curr, true
+			}
+		}
+
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break
+		}
+		curr = parent
+	}
+	return "", false
+}

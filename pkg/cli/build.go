@@ -10,6 +10,7 @@ import (
 
 	"github.com/repyh/typego/compiler"
 	"github.com/repyh/typego/internal/builder"
+	"github.com/repyh/typego/internal/ecosystem"
 	"github.com/repyh/typego/internal/linker"
 	"github.com/spf13/cobra"
 )
@@ -131,19 +132,13 @@ go 1.23.6
 			os.Exit(1)
 		}
 
-		// Detect Dev Mode
+		// Detect Dev Mode using FindRepoRoot
 		cwd, _ := os.Getwd()
-		absCwd, _ := filepath.Abs(cwd)
-		isLocalDev := false
-		if data, err := os.ReadFile(filepath.Join(absCwd, "go.mod")); err == nil {
-			if strings.Contains(string(data), "module github.com/repyh/typego") {
-				isLocalDev = true
-			}
-		}
+		typegoRoot, isLocalDev := ecosystem.FindRepoRoot(cwd)
 
 		if isLocalDev {
-			fmt.Println("🔧 typego dev mode: using local source replacement")
-			replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+absCwd)
+			fmt.Println("🔧 typego dev mode: using local source replacement at", typegoRoot)
+			replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+typegoRoot)
 			replaceCmd.Dir = tmpDir
 			_ = replaceCmd.Run()
 		}

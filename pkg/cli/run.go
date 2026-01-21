@@ -155,19 +155,13 @@ go 1.23.6
 	_ = os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0644)
 
 	// Point to local TypeGo source ONLY if we are in the repo (Dev Mode)
-	// Otherwise, use the published version
+	// Detect if we are running in the typego repo for local development
 	cwd, _ := os.Getwd()
-	absCwd, _ := filepath.Abs(cwd)
-	isLocalDev := false
-	if data, err := os.ReadFile(filepath.Join(absCwd, "go.mod")); err == nil {
-		if strings.Contains(string(data), "module github.com/repyh/typego") {
-			isLocalDev = true
-		}
-	}
+	typegoRoot, isLocalDev := ecosystem.FindRepoRoot(cwd)
 
 	if isLocalDev {
-		fmt.Println("🔧 typego dev mode: using local source replacement")
-		replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+absCwd)
+		fmt.Printf("🔧 typego dev mode: using local source replacement at %s\n", typegoRoot)
+		replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+typegoRoot)
 		replaceCmd.Dir = tmpDir
 		_ = replaceCmd.Run()
 	}

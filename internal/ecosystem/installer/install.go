@@ -107,20 +107,15 @@ func RunInstall(cwd string) error {
 	// Initialize go.mod in workDir
 	_ = resolver.InitGoMod(workDir, "typego_jit_build")
 
-	// Add replacement for local typego source so JIT binary can find pkg/cli
-	// We use the cwd as the root of the typego repo
-	typegoRoot, _ := filepath.Abs(filepath.Join(cwd, "..", "..")) // This is wrong if user is in a project.
-	// We need the ACTUAL path to the installed typego source.
-	// For dev purposes, we can try to find it or assume it's where the current binary is.
-	// But the user might be in a different directory.
+	// Detect if we are in the typego repo (local dev) to add source replacement
+	typegoRoot, isLocalDev := ecosystem.FindRepoRoot(cwd)
 
-	// A better way: the installer should know where it is located or where the repo is.
-	// Since we are running from source, we can try to detect the module root.
-
-	// For now, let's try to add it and see.
-	replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+typegoRoot)
-	replaceCmd.Dir = workDir
-	_ = replaceCmd.Run()
+	if isLocalDev {
+		fmt.Printf("🔧 typego dev mode: using local source replacement at %s\n", typegoRoot)
+		replaceCmd := exec.Command("go", "mod", "edit", "-replace", "github.com/repyh/typego="+typegoRoot)
+		replaceCmd.Dir = workDir
+		_ = replaceCmd.Run()
+	}
 
 	requireCmd := exec.Command("go", "mod", "edit", "-require", "github.com/repyh/typego@v0.0.0")
 	requireCmd.Dir = workDir
