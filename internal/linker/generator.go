@@ -90,10 +90,6 @@ func GenerateTypes(info *PackageInfo) string {
 	return sb.String()
 }
 
-func generateStructInterface(st ExportedStruct) string {
-	return generateStructInterfaceWithContext(st, nil)
-}
-
 func generateStructInterfaceWithContext(st ExportedStruct, knownStructs map[string]bool) string {
 	var sb strings.Builder
 
@@ -146,10 +142,6 @@ func generateStructInterfaceWithContext(st ExportedStruct, knownStructs map[stri
 	return sb.String()
 }
 
-func generateMethodSignature(m MethodInfo) string {
-	return generateMethodSignatureWithContext(m, nil)
-}
-
 func generateMethodSignatureWithContext(m MethodInfo, knownStructs map[string]bool) string {
 	var args []string
 	for i, arg := range m.Args {
@@ -189,10 +181,6 @@ func generateMethodSignatureWithContext(m MethodInfo, knownStructs map[string]bo
 	}
 	sb.WriteString(fmt.Sprintf("\t\t%s(%s): %s;\n", m.Name, strings.Join(args, ", "), retType))
 	return sb.String()
-}
-
-func generateFunctionDecl(fn ExportedFunc) string {
-	return generateFunctionDeclWithContext(fn, nil)
 }
 
 func generateFunctionDeclWithContext(fn ExportedFunc, knownStructs map[string]bool) string {
