@@ -87,6 +87,7 @@ func RunInstall(cwd string) error {
 	tsShims := make(map[string]string)
 	var bridgeBlock strings.Builder
 	namedImports := make(map[string]string)
+	var packageInfos []*linker.PackageInfo // For auto-types generation
 
 	fmt.Println("📦 Resolving dependencies...")
 
@@ -147,6 +148,7 @@ func RunInstall(cwd string) error {
 				tsShims[m] = linker.GenerateTSShim(info)
 				bridgeBlock.WriteString(linker.GenerateShim(info, "pkg_"+info.Name))
 				namedImports[cleanName] = info.Name
+				packageInfos = append(packageInfos, info) // Collect for types
 			} else {
 				fmt.Printf("   ⚠️  Failed to inspect %s: %v\n", cleanName, err)
 			}
@@ -189,5 +191,77 @@ func RunInstall(cwd string) error {
 		_ = ecosystem.WriteChecksum(cwd, hash)
 	}
 
+	// Generate lockfile from resolved go.mod
+	writeLockfile(cwd, workDir, config.Dependencies)
+
+	// Auto-generate types
+	if len(packageInfos) > 0 {
+		fmt.Println("📦 Syncing type definitions...")
+		writeTypeDefinitions(cwd, packageInfos)
+	}
+
 	return nil
+}
+
+func writeLockfile(projectRoot, workDir string, deps map[string]string) {
+	goModPath := filepath.Join(workDir, "go.mod")
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return
+	}
+
+	lockfile := ecosystem.DefaultLockfile()
+
+	// Parse require directives to extract resolved versions
+	lines := strings.Split(string(data), "\n")
+	inRequire := false
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "require (" {
+			inRequire = true
+			continue
+		}
+		if line == ")" {
+			inRequire = false
+			continue
+		}
+		if inRequire && len(line) > 0 && !strings.HasPrefix(line, "//") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				pkgPath := parts[0]
+				version := parts[1]
+				// Only include user dependencies, not transitive
+				if _, isDep := deps[pkgPath]; isDep {
+					lockfile.Resolved[pkgPath] = ecosystem.ResolvedPackage{Version: version}
+				}
+			}
+		}
+	}
+
+	if len(lockfile.Resolved) == 0 {
+		return
+	}
+
+	lockData, _ := json.MarshalIndent(lockfile, "", "  ")
+	lockPath := filepath.Join(projectRoot, ecosystem.LockFileName)
+	_ = os.WriteFile(lockPath, lockData, 0644)
+	fmt.Printf("🔒 Lockfile written to %s\n", ecosystem.LockFileName)
+}
+
+func writeTypeDefinitions(projectRoot string, infos []*linker.PackageInfo) {
+	typesDir := filepath.Join(projectRoot, ".typego", "types")
+	_ = os.MkdirAll(typesDir, 0755)
+
+	var sb strings.Builder
+	for _, info := range infos {
+		sb.WriteString(linker.GenerateTypes(info))
+		sb.WriteString("\n")
+	}
+
+	if sb.Len() > 0 {
+		outPath := filepath.Join(typesDir, "go.d.ts")
+		// Append to existing file if present
+		existing, _ := os.ReadFile(outPath)
+		_ = os.WriteFile(outPath, append(existing, []byte(sb.String())...), 0644)
+	}
 }

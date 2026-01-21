@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/repyh/typego/pkg/cli/cmd"
 	"github.com/repyh/typego/pkg/cli/internal"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,7 @@ Examples:
   typego add github.com/gin-gonic/gin@v1.9.0
   typego add github.com/stretchr/testify@latest`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(c *cobra.Command, args []string) {
 		cwd, err := os.Getwd()
 		if err != nil {
 			internal.Error(fmt.Sprintf("Failed to get cwd: %v", err))
@@ -63,6 +64,12 @@ Examples:
 		}
 
 		internal.Success(fmt.Sprintf("Added %s@%s", module, version))
-		internal.Info("Run 'typego install' to build the JIT binary")
+
+		// Auto-regenerate types
+		fmt.Println("📦 Regenerating types...")
+		cmd.TypesCmd.SetArgs([]string{})
+		if err := cmd.TypesCmd.Execute(); err != nil {
+			internal.Warn("Types generation skipped (run 'typego install' to fetch and build)")
+		}
 	},
 }
