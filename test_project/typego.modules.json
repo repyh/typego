@@ -1,9 +1,0 @@
-{
-  "$schema": "https://typego.dev/schemas/modules.json",
-  "dependencies": {
-    "github.com/gin-gonic/gin": "v1.9.0"
-  },
-  "compiler": {
-    "goVersion": "1.24"
-  }
-}

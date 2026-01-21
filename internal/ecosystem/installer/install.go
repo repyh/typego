@@ -117,13 +117,16 @@ func RunInstall(cwd string) error {
 		_ = replaceCmd.Run()
 	}
 
-	requireCmd := exec.Command("go", "mod", "edit", "-require", "github.com/repyh/typego@v0.0.0")
+	requireCmd := exec.Command("go", "mod", "edit", "-require", "github.com/repyh/typego@v1.3.1")
 	requireCmd.Dir = workDir
 	_ = requireCmd.Run()
 
 	tidyCmd := exec.Command("go", "mod", "tidy")
 	tidyCmd.Dir = workDir
-	_ = tidyCmd.Run()
+	tidyCmd.Env = append(os.Environ(), "GOPROXY=off") // Force local resolution
+	if err := tidyCmd.Run(); err != nil {
+		fmt.Printf("⚠️ go mod tidy failed: %v\n", err)
+	}
 
 	// Filter imports that are external
 	for m := range usedMap {

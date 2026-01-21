@@ -45,6 +45,16 @@ cd myapp
 typego run src/index.ts
 ```
 
+## Project Structure
+
+A standard TypeGo project consists of the following structure:
+
+- `src/`: Directory for your TypeScript source files.
+- `typego.modules.json`: Configuration for external Go dependencies and toolchain settings.
+- `tsconfig.json`: TypeScript compiler configuration (pre-configured for Go imports).
+- `.typego/`: **[Internal]** Hidden workspace for JIT-compiled binaries, generated types, and build cache. This directory is automatically managed and ignored by Git.
+- `package.json`: Standard Node.js manifest for NPM dependencies (handled via esbuild).
+
 ### Commands
 
 | Command | Description |
