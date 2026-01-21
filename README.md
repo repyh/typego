@@ -61,11 +61,32 @@ A standard TypeGo project consists of the following structure:
 |---------|-------------|
 | `typego run <file>` | Execute TypeScript (fast interpreter mode) |
 | `typego dev <file>` | Development server with hot-reload |
-| `typego run --compile <file>` | Compile and run as standalone binary |
-| `typego build <file> -o <out>` | Build standalone executable |
-| `typego build <file> --target` | Cross-compile (e.g. linux-amd64) |
+| `typego build <file>` | Build standalone executable |
+| `typego init [name]` | Scaffold new project (`--npm` for Node interop) |
 | `typego types` | Generate `.d.ts` for Go imports |
-| `typego init <name>` | Scaffold new project |
+| `typego add <pkg>` | Add a Go module dependency |
+| `typego remove <pkg>` | Remove a Go module dependency |
+| `typego list` | List configured Go dependencies |
+| `typego update` | Update Go modules to latest versions |
+| `typego outdated` | Check for newer Go module versions |
+| `typego install` | Manually trigger JIT build/dependency resolution |
+| `typego clean` | Reset build cache and temporary workspace |
+
+### Package Management
+
+TypeGo uses a `typego.modules.json` file to manage Go dependencies. This allows you to use any Go package in your TypeScript code.
+
+```bash
+# Add a Go package
+typego add github.com/gin-gonic/gin
+```
+```typescript
+// src/index.ts
+import { Default } from "go:github.com/gin-gonic/gin";
+const r = Default();
+r.GET("/ping", (c) => c.JSON(200, { message: "pong" }));
+r.Run();
+```
 
 ## Examples
 

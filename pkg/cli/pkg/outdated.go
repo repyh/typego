@@ -64,12 +64,12 @@ Example:
 
 func fetchLatestVersion(module string) (string, error) {
 	tmpDir := filepath.Join(os.TempDir(), "typego-outdated-check")
-	os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	_ = os.MkdirAll(tmpDir, 0755)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	initCmd := exec.Command("go", "mod", "init", "temp")
 	initCmd.Dir = tmpDir
-	initCmd.Run()
+	_ = initCmd.Run()
 
 	cmd := exec.Command("go", "list", "-m", "-versions", module)
 	cmd.Dir = tmpDir

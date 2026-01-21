@@ -98,13 +98,13 @@ Examples:
 func getLatestVersion(module string) (string, error) {
 	// Create temp dir for go list
 	tmpDir := filepath.Join(os.TempDir(), "typego-update-check")
-	os.MkdirAll(tmpDir, 0755)
-	defer os.RemoveAll(tmpDir)
+	_ = os.MkdirAll(tmpDir, 0755)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Initialize a dummy go.mod
 	initCmd := exec.Command("go", "mod", "init", "temp")
 	initCmd.Dir = tmpDir
-	initCmd.Run()
+	_ = initCmd.Run()
 
 	// Query latest version
 	cmd := exec.Command("go", "list", "-m", "-versions", module)
