@@ -362,7 +362,7 @@ import { makeShared } from "typego:memory";
 // This buffer is allocated in Go memory and mapped to both runtimes
 const sharedBuf = makeShared("globalCounter", 1024);
 
-const view = new Int32Array(sharedBuf);
+const view = new Int32Array(sharedBuf.buffer);
 Atomics.add(view, 0, 1); // Thread-safe atomic operation
 ```
 
