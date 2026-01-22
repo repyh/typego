@@ -14,6 +14,15 @@ type Binding struct {
 	Target interface{}
 }
 
+// methodInfo holds metadata about an exported method to avoid repeated reflection lookups.
+type methodInfo struct {
+	Name  string
+	Index int
+}
+
+// cache for struct method metadata: reflect.Type -> []methodInfo
+var typeMethodCache sync.Map
+
 // BindStruct exposes a Go struct to JavaScript with full field and method access.
 // Supports nested structs (converted recursively) and callback arguments.
 func BindStruct(vm *sobek.Runtime, name string, s interface{}) error {
@@ -115,22 +124,42 @@ func bindMethods(vm *sobek.Runtime, obj *sobek.Object, v reflect.Value, visited 
 	if v.CanAddr() {
 		vPtr = v.Addr()
 	} else {
+		// Create a copy to get an addressable value if needed for methods
+		// This allocation is unavoidable if we want to call pointer methods on value types
 		vCopy := reflect.New(v.Type())
 		vCopy.Elem().Set(v)
 		vPtr = vCopy
 	}
 
 	tPtr := vPtr.Type()
-	for i := 0; i < tPtr.NumMethod(); i++ {
-		method := tPtr.Method(i)
-		if !method.IsExported() {
-			continue
+
+	// @optimized: Use cached method metadata to avoid repeated reflection overhead (NumMethod, IsExported).
+	var methods []methodInfo
+	cached, loaded := typeMethodCache.Load(tPtr)
+	if loaded {
+		if cachedMethods, ok := cached.([]methodInfo); ok {
+			methods = cachedMethods
 		}
+	}
 
-		methodVal := vPtr.Method(i)
-		methodName := method.Name
+	if methods == nil {
+		numMethods := tPtr.NumMethod()
+		methods = make([]methodInfo, 0, numMethods)
+		for i := 0; i < numMethods; i++ {
+			method := tPtr.Method(i)
+			if method.IsExported() {
+				methods = append(methods, methodInfo{
+					Name:  method.Name,
+					Index: i,
+				})
+			}
+		}
+		typeMethodCache.Store(tPtr, methods)
+	}
 
-		_ = obj.Set(methodName, createMethodWrapper(vm, methodVal, methodName, visited))
+	for _, m := range methods {
+		methodVal := vPtr.Method(m.Index)
+		_ = obj.Set(m.Name, createMethodWrapper(vm, methodVal, m.Name, visited))
 	}
 }
 
@@ -141,10 +170,10 @@ var argsPool = sync.Pool{
 }
 
 func createMethodWrapper(vm *sobek.Runtime, methodVal reflect.Value, methodName string, visited map[uintptr]sobek.Value) func(sobek.FunctionCall) sobek.Value {
-	return func(call sobek.FunctionCall) sobek.Value {
-		methodType := methodVal.Type()
-		numIn := methodType.NumIn()
+	methodType := methodVal.Type()
+	numIn := methodType.NumIn()
 
+	return func(call sobek.FunctionCall) sobek.Value {
 		// Optimize: Use pool for common small argument lists
 		var goArgs []reflect.Value
 		if numIn <= 8 {
@@ -182,17 +211,28 @@ func createMethodWrapper(vm *sobek.Runtime, methodVal reflect.Value, methodName 
 			return sobek.Undefined()
 		}
 
-		if len(results) == 1 {
-			jsVal, _ := bindValue(vm, results[0], visited)
-			return jsVal
+		// Handle (Value, error) pattern common in Go
+		if len(results) == 2 && methodType.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			if !results[1].IsNil() {
+				err := results[1].Interface().(error)
+				panic(vm.NewGoError(err))
+			}
+			val, _ := bindValue(vm, results[0], visited)
+			return val
 		}
 
-		arr := vm.NewArray()
+		if len(results) == 1 {
+			val, _ := bindValue(vm, results[0], visited)
+			return val
+		}
+
+		// Multiple results: return as array
+		retVals := make([]interface{}, len(results))
 		for i, r := range results {
 			jsVal, _ := bindValue(vm, r, visited)
-			_ = arr.Set(fmt.Sprintf("%d", i), jsVal)
+			retVals[i] = jsVal
 		}
-		return arr
+		return vm.NewArray(retVals...)
 	}
 }
 
@@ -261,21 +301,30 @@ func wrapJSCallback(vm *sobek.Runtime, callable sobek.Callable, goType reflect.T
 }
 
 func bindSlice(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Value) (sobek.Value, error) {
-	arr := vm.NewArray()
-	for i := 0; i < v.Len(); i++ {
+	// @optimized: Pre-allocate slice and use NewArray(vals...) to avoid repeated Set calls.
+	l := v.Len()
+	vals := make([]interface{}, l)
+	for i := 0; i < l; i++ {
 		elem, err := bindValue(vm, v.Index(i), visited)
 		if err != nil {
 			return nil, err
 		}
-		_ = arr.Set(fmt.Sprintf("%d", i), elem)
+		vals[i] = elem
 	}
-	return arr, nil
+	return vm.NewArray(vals...), nil
 }
 
 func bindMap(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Value) (sobek.Value, error) {
 	obj := vm.NewObject()
 	for _, key := range v.MapKeys() {
-		keyStr := fmt.Sprintf("%v", key.Interface())
+		var keyStr string
+		// @optimized: Avoid Sprintf if key is already a string.
+		if key.Kind() == reflect.String {
+			keyStr = key.String()
+		} else {
+			keyStr = fmt.Sprint(key.Interface())
+		}
+
 		val, err := bindValue(vm, v.MapIndex(key), visited)
 		if err != nil {
 			return nil, err
