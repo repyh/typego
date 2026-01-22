@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/repyh/typego/bridge/core"
+	"github.com/repyh/typego/bridge/intrinsics"
 	bridge_crypto "github.com/repyh/typego/bridge/modules/crypto"
+
 	bridge_net "github.com/repyh/typego/bridge/modules/net"
 	bridge_sync "github.com/repyh/typego/bridge/modules/sync"
 	bridge_memory "github.com/repyh/typego/bridge/stdlib/memory"
@@ -30,12 +32,23 @@ var TypesCmd = &cobra.Command{
 			return
 		}
 
-		// Read existing (target) file first, or use embedded default
+		// Read existing (target) file first
 		var currentContent []byte
 		if existing, err := os.ReadFile(dtsPath); err == nil && len(existing) > 0 {
 			currentContent = existing
+		}
+
+		// Always ensure global types are up to date at the start
+		newGlobal := string(core.GlobalTypes) + "\n" + intrinsics.IntrinsicTypes
+
+		reGlobal := regexp.MustCompile(`(?s)^// TypeGo Type Definitions.*?// TypeGo Namespaces`)
+		if reGlobal.Match(currentContent) {
+			currentContent = reGlobal.ReplaceAll(currentContent, []byte(newGlobal))
+		} else if len(currentContent) == 0 {
+			currentContent = []byte(newGlobal)
 		} else {
-			currentContent = core.GlobalTypes
+			// Prepend if not found
+			currentContent = append([]byte(newGlobal+"\n"), currentContent...)
 		}
 
 		fetcher, err := linker.NewFetcher()
@@ -102,8 +115,22 @@ var TypesCmd = &cobra.Command{
 			}
 		}
 
-		// Generate types for each unique import
+		// Generate types for each unique import (Recursive Resolution)
+		processed := make(map[string]bool)
+		queue := []string{}
 		for imp := range goImports {
+			queue = append(queue, imp)
+		}
+
+		for len(queue) > 0 {
+			imp := queue[0]
+			queue = queue[1:]
+
+			if processed[imp] {
+				continue
+			}
+			processed[imp] = true
+
 			// Skip modules that are already fully defined in std.d.ts
 			if imp == "go:net/http" || imp == "go:sync" || imp == "typego:memory" || imp == "typego:worker" || imp == "go:memory" || imp == "go:crypto" {
 				continue
@@ -112,22 +139,9 @@ var TypesCmd = &cobra.Command{
 			fmt.Printf("📦 Generating types for %s...\n", imp)
 
 			var pkgPath string
-
 			if strings.HasPrefix(imp, "go:") {
-				name := imp[3:]
-				switch name {
-				case "fmt", "os", "net/url":
-					// Inspect native Go package for high-quality types
-					pkgPath = name
-				default:
-					pkgPath = name
-				}
-			} else if strings.HasPrefix(imp, "typego:") {
-				// typego: modules usually handled in std.d.ts, but if any dynamic ones added later...
-				continue
-			}
-
-			if pkgPath == "" {
+				pkgPath = strings.TrimPrefix(imp, "go:")
+			} else {
 				continue
 			}
 
@@ -146,8 +160,28 @@ var TypesCmd = &cobra.Command{
 				continue
 			}
 
+			// Discovery Discovery: Add imports from fields/embeds to the queue
+			for _, st := range info.Structs {
+				for _, field := range st.Fields {
+					if field.ImportPath != "" && field.ImportPath != pkgPath {
+						newImp := "go:" + field.ImportPath
+						if !processed[newImp] {
+							queue = append(queue, newImp)
+						}
+					}
+				}
+				for _, embed := range st.Embeds {
+					if embed.ImportPath != "" && embed.ImportPath != pkgPath {
+						newImp := "go:" + embed.ImportPath
+						if !processed[newImp] {
+							queue = append(queue, newImp)
+						}
+					}
+				}
+			}
+
 			// Update ImportPath to match the requested import (e.g. "go:fmt" -> "fmt" so generator adds "go:")
-			info.ImportPath = strings.TrimPrefix(imp, "go:")
+			info.ImportPath = pkgPath
 
 			newTypeBlock := linker.GenerateTypes(info)
 

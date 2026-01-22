@@ -1,18 +1,18 @@
-package polyfills
+package intrinsics
 
 import (
 	"os"
 	"runtime"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // EnableProcess injects the Node.js `process` global
-func EnableProcess(vm *goja.Runtime) {
-	proc := vm.NewObject()
+func (r *Registry) EnableProcess() {
+	proc := r.vm.NewObject()
 
-	env := vm.NewObject()
+	env := r.vm.NewObject()
 	whitelist := map[string]bool{
 		"PATH":     true,
 		"LANG":     true,
@@ -41,9 +41,9 @@ func EnableProcess(vm *goja.Runtime) {
 	_ = proc.Set("platform", runtime.GOOS)
 
 	// process.cwd()
-	_ = proc.Set("cwd", func(call goja.FunctionCall) goja.Value {
+	_ = proc.Set("cwd", func(call sobek.FunctionCall) sobek.Value {
 		wd, _ := os.Getwd()
-		return vm.ToValue(wd)
+		return r.vm.ToValue(wd)
 	})
 
 	// process.argv
@@ -52,5 +52,5 @@ func EnableProcess(vm *goja.Runtime) {
 	// process.version
 	_ = proc.Set("version", runtime.Version())
 
-	_ = vm.Set("process", proc)
+	_ = r.vm.Set("process", proc)
 }

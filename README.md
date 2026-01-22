@@ -11,11 +11,12 @@ typego is an embedded TypeScript runtime for Go. It lets you script Go applicati
 > [!NOTE]
 > **Project Status**: TypeGo is under active development. However, please note that **maintenance is limited** as I am balancing this project with my university commitments. Issues and PRs are welcome but may see delayed responses.
 
-Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS engine (Goja) directly inside your Go process. You can import Go packages as if they were native TS modules using the go: prefix, allowing for zero-copy data sharing and direct access to Go’s standard library.
+Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS engine (Sobek) directly inside your Go process. You can import Go packages as if they were native TS modules using the go: prefix, allowing for zero-copy data sharing and direct access to Go’s standard library.
 
 ## Features
 
 - **Direct Go Integration**: Import any Go package as a native TS module (`go:fmt`, `go:github.com/gin-gonic/gin`).
+- **Standard Library Intrinsics**: Direct access to Go-native keywords and types like `go` routines, `makeChan`, `select`, `defer`, `ref`/`deref`, and `make`/`cap`.
 - **Smarter Type Linker**: Automatic, recursive type generation for Go structs, interfaces, and methods. Supports struct embedding (`extends`) and nested type resolution.
 - **True Parallelism**: Goroutine-based workers with zero-copy shared memory (`typego:memory`).
 - **Modern Package Ecosystem**: Built-in CLI for managing Go dependencies with `typego.modules.json` and `typego.lock`.
@@ -24,7 +25,7 @@ Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS 
 ## Tech Stack
 
 - **Language**: Go 1.21+, TypeScript
-- **JS Engine**: Goja (pure Go, no CGO)
+- **JS Engine**: Sobek (fork of Goja, pure Go)
 - **Bundler**: esbuild
 - **CLI**: Cobra
 
@@ -43,6 +44,26 @@ typego init myapp
 cd myapp
 typego run src/index.ts
 ```
+
+## Standard Library Intrinsics
+
+TypeGo provides first-class support for Go-native keywords and low-level primitives as global functions.
+
+| Function | Type | Description |
+|----------|--------|-------------|
+| `go(fn, ...args)` | Concurrency | Launches a background goroutine. |
+| `makeChan<T>(size?)` | Concurrency | Creates a synchronized Go channel. |
+| `select(cases)` | Concurrency | Multiplexes channel operations (send/receive/default). |
+| `ref(val)` | Memory | Creates a pointer handle (`Ref<T>`) to a value on the Go heap. |
+| `deref(ptr)` | Memory | Dereferences a pointer or `Ref` object. |
+| `make(Type, len, cap?)` | Memory | Allocates high-performance slices (TypedArrays). |
+| `cap(v)` | Memory | Returns the capacity of a slice or buffer. |
+| `copy(dst, src)` | Memory | Performs high-speed memory copying between buffers. |
+| `sizeof(obj)` | Memory | Estimates the memory footprint of a JS/Go object. |
+| `defer(fn)` | Control | Registers a function to run when the current `typego.scope` exits. |
+| `panic(err)` | Control | Triggers a native Go panic. |
+| `recover()` | Control | Recovers from a panic inside a `defer` block. |
+| `iota` | Constant | Auto-incrementing compile-time constant. |
 
 ## Project Structure
 
@@ -122,6 +143,35 @@ Spawn(async () => {
     console.log(`Heartbeat ${i}`);
   }
 });
+```
+
+### Intrinsics
+A short example demonstrating channels, `select`, and pointer handles (`ref`/`deref`).
+
+```typescript
+import { Println } from "go:fmt";
+
+// Channels + select
+const ch = makeChan<number>(1);
+
+go(() => {
+  ch.send(42);
+});
+
+select([
+  { chan: ch, recv: (v) => Println("received:", v) },
+  { default: () => Println("no message") }
+]);
+
+// Pointer handles
+const r = ref(100);
+Println("before:", deref(r)); // 100
+r.value = 200;
+Println("after:", deref(r)); // 200
+
+// TypedArray helpers
+const buf = make(Uint8Array, 4);
+Println("capacity:", cap(buf));
 ```
 
 ## Applications

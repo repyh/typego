@@ -4,3 +4,7 @@
 // Helper for handling Go errors in catch blocks
 declare function isGoError(e: unknown): e is Error;
 
+// TypeGo Namespaces
+declare namespace typego {
+    // Other typego namespaces can be added here
+}

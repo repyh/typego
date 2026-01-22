@@ -8,12 +8,14 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/repyh/typego/bridge/core"
+	"github.com/repyh/typego/bridge/intrinsics"
 	"github.com/repyh/typego/bridge/stdlib/memory"
 	"github.com/repyh/typego/bridge/stdlib/worker"
 	"github.com/repyh/typego/eventloop"
 
+	_ "github.com/repyh/typego/bridge/intrinsics"
 	_ "github.com/repyh/typego/bridge/modules/crypto"
 	_ "github.com/repyh/typego/bridge/modules/fmt"
 	_ "github.com/repyh/typego/bridge/modules/json"
@@ -36,12 +38,14 @@ func AddGlobalHook(hook GlobalEngineHook) {
 type ErrorHandler func(err error, stack string)
 
 type Engine struct {
-	VM            *goja.Runtime
+	VM            *sobek.Runtime
 	MemoryLimit   uint64
 	EventLoop     *eventloop.EventLoop
 	MemoryFactory *memory.Factory
+	Intrinsics    *intrinsics.Registry
 
 	// OnError is called when an unhandled error occurs in the engine
+
 	OnError ErrorHandler
 
 	ctx    context.Context
@@ -50,7 +54,7 @@ type Engine struct {
 
 func (e *Engine) WrapError(recovered interface{}) error {
 	switch v := recovered.(type) {
-	case *goja.Exception:
+	case *sobek.Exception:
 		return v
 	case error:
 		return fmt.Errorf("runtime error: %w", v)
@@ -62,7 +66,7 @@ func (e *Engine) WrapError(recovered interface{}) error {
 }
 
 func NewEngine(memoryLimit uint64, mf *memory.Factory) *Engine {
-	vm := goja.New()
+	vm := sobek.New()
 	vm.SetMaxCallStackSize(1000)
 
 	el := eventloop.NewEventLoop(vm)
@@ -80,11 +84,15 @@ func NewEngine(memoryLimit uint64, mf *memory.Factory) *Engine {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Enable Global Intrinsics (panic, sizeof, typego.scope)
+	intrinsicsReg := intrinsics.Enable(vm, el)
+
 	eng := &Engine{
 		VM:            vm,
 		MemoryLimit:   memoryLimit,
 		EventLoop:     el,
 		MemoryFactory: mf,
+		Intrinsics:    intrinsicsReg,
 		ctx:           ctx,
 		cancel:        cancel,
 	}
@@ -103,13 +111,18 @@ func NewEngine(memoryLimit uint64, mf *memory.Factory) *Engine {
 	return eng
 }
 
-func (e *Engine) Run(js string) (goja.Value, error) {
+func (e *Engine) Run(js string) (sobek.Value, error) {
+	e.Intrinsics.VMLock.Lock()
+	defer e.Intrinsics.VMLock.Unlock()
 	return e.VM.RunString(js)
 }
 
 // RunSafe executes JS code with panic recovery. If a panic occurs, it is
 // converted to an error and passed to OnError if set.
-func (e *Engine) RunSafe(js string) (result goja.Value, err error) {
+func (e *Engine) RunSafe(js string) (result sobek.Value, err error) {
+	e.Intrinsics.VMLock.Lock()
+	defer e.Intrinsics.VMLock.Unlock()
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = e.WrapError(r)
