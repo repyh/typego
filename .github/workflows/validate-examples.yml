@@ -1,0 +1,105 @@
+name: Validate Example Projects
+
+on:
+  push:
+    branches: [ main, v1.5.0 ]
+  pull_request:
+    branches: [ main, v1.5.0 ]
+
+jobs:
+  list-projects:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.set-matrix.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set-matrix
+        run: |
+          # Discover all project directories in examples/projects/
+          # We look for folders containing typego.modules.json
+          DIRS=$(find examples/projects -maxdepth 1 -mindepth 1 -type d -exec test -e "{}/typego.modules.json" \; -print)
+          PROJECTS_JSON=$(echo "$DIRS" | jq -R -s -c 'split("\n")[:-1]')
+          echo "projects=$PROJECTS_JSON" >> $GITHUB_OUTPUT
+
+  validate:
+    needs: list-projects
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs: list-projects.outputs.projects) }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Build TypeGo CLI
+        run: |
+          go build -v -o typego ./cmd/typego
+          echo "$(pwd)" >> $GITHUB_PATH
+
+      - name: Validate Project
+        working-directory: ${{ matrix.project }}
+        shell: bash
+        run: |
+          echo "Processing Project: ${{ matrix.project }}"
+          
+          # 1. Dependency Resolution
+          # This triggers JIT builds and type generation for Go modules
+          typego install
+          
+          # 2. Compilation Check
+          # Ensures esbuild and the transformer pipeline handle the code
+          typego build src/index.ts -o service_bin
+          
+          # 3. Runtime Verification (Background Server)
+          # We run the project in background to test the event loop and bridge
+          typego run src/index.ts > output.log 2>&1 &
+          TG_PID=$!
+          
+          # 4. Wait for Health Check
+          # Max wait 30 seconds for the server to be ready on :8080
+          # Note: We use 8080 as it's the standard for TypeGo web examples
+          MAX_RETRIES=30
+          HEALTHY=false
+          
+          echo "Waiting for service to start..."
+          for i in $(seq 1 $MAX_RETRIES); do
+            # Check /api/health (Gin project standard) or root
+            if curl -s http://localhost:8080/api/health > /dev/null || curl -s http://localhost:8080/ > /dev/null; then
+              HEALTHY=true
+              break
+            fi
+            sleep 1
+          done
+          
+          if [ "$HEALTHY" = false ]; then
+            echo "❌ Service failed to start or health check timed out"
+            cat output.log
+            kill $TG_PID || true
+            exit 1
+          fi
+          
+          echo "✅ Service is running and healthy"
+          
+          # 5. Functional Smoke Test (Project Specific)
+          if [[ "${{ matrix.project }}" == *"link-shortener"* ]]; then
+            echo "Running link-shortener smoke test..."
+            RES=$(curl -s "http://localhost:8080/api/shorten?url=https://github.com")
+            if [[ $RES == *"short_url"* ]]; then
+              echo "✅ Smoke test passed: URL shortened successfully"
+            else
+              echo "❌ Smoke test failed: Unexpected response $RES"
+              cat output.log
+              kill $TG_PID || true
+              exit 1
+            fi
+          fi
+          
+          # Clean up
+          kill $TG_PID || true
+          echo "🚀 Project validation successful!"
