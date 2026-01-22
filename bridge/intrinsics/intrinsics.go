@@ -30,6 +30,8 @@ func Enable(vm *sobek.Runtime, el *eventloop.EventLoop) *Registry {
 	_ = vm.Set("cap", r.Cap)
 	_ = vm.Set("make", r.Make)
 	_ = vm.Set("copy", r.Copy)
+	_ = vm.Set("wrapReader", r.WrapReader)
+	_ = vm.Set("wrapWriter", r.WrapWriter)
 
 	// Background backup for polyfills
 	_ = vm.Set("__encode", r.Encode)

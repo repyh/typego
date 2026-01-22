@@ -30,7 +30,7 @@ type ExportedStruct struct {
 	Doc         string
 	Fields      []FieldInfo
 	Methods     []MethodInfo
-	Embeds      []string // Embedded struct type names (for interface extension)
+	Embeds      []FieldInfo // Embedded types (for interface extension)
 }
 
 type FieldInfo struct {
@@ -198,10 +198,34 @@ func parseTypeDecl(decl *ast.GenDecl, structMap map[string]*ExportedStruct, pkgP
 
 				// Embedded field (no name) - capture for interface extension
 				if len(field.Names) == 0 {
-					embedType := strings.TrimPrefix(goType, "*")
-					// Only add if it looks like a struct type (capitalized)
-					if len(embedType) > 0 && embedType[0] >= 'A' && embedType[0] <= 'Z' {
-						exported.Embeds = append(exported.Embeds, embedType)
+					goType := types.ExprString(field.Type)
+					cleanType := strings.TrimPrefix(goType, "*")
+
+					// Resolve import path for embedded type
+					var importPath string
+					if info != nil {
+						if t, ok := info.Types[field.Type]; ok {
+							if named, ok := t.Type.(*types.Named); ok {
+								if pkg := named.Obj().Pkg(); pkg != nil {
+									importPath = pkg.Path()
+								}
+							} else if ptr, ok := t.Type.(*types.Pointer); ok {
+								if named, ok := ptr.Elem().(*types.Named); ok {
+									if pkg := named.Obj().Pkg(); pkg != nil {
+										importPath = pkg.Path()
+									}
+								}
+							}
+						}
+					}
+
+					// Only add if it looks like a struct type (capitalized or qualified)
+					if len(cleanType) > 0 {
+						exported.Embeds = append(exported.Embeds, FieldInfo{
+							Name:       cleanType,
+							Type:       goType,
+							ImportPath: importPath,
+						})
 					}
 					continue
 				}

@@ -65,6 +65,10 @@ We use [Conventional Commits](https://www.conventionalcommits.org/).
 ```text
 typego/
 ├── bridge/          # Native bindings between Go and JavaScript
+│   ├── core/        # Runtime reflection, globals, and console
+│   ├── intrinsics/  # Go-native keywords (defer, panic, ref, go)
+│   ├── modules/     # Standard library shims (os, fmt, net, sync)
+│   └── stdlib/      # Higher-level TypeGo-specific modules
 ├── cmd/typego/      # CLI entry point (Cobra root)
 ├── compiler/        # ESBuild wrapper for bundling and caching
 ├── engine/          # Core Sobek runtime wrapper

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/grafana/sobek"
 )
@@ -56,13 +57,23 @@ func bindValue(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Val
 }
 
 func bindStruct(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Value) (sobek.Value, error) {
-	t := v.Type()
 	obj := vm.NewObject()
 
 	if v.CanAddr() {
 		visited[v.Addr().Pointer()] = obj
 	}
 
+	if err := bindStructFields(vm, obj, v, visited); err != nil {
+		return nil, err
+	}
+
+	bindMethods(vm, obj, v, visited)
+
+	return obj, nil
+}
+
+func bindStructFields(vm *sobek.Runtime, obj *sobek.Object, v reflect.Value, visited map[uintptr]sobek.Value) error {
+	t := v.Type()
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if !field.IsExported() {
@@ -70,16 +81,33 @@ func bindStruct(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Va
 		}
 
 		fieldVal := v.Field(i)
+
+		// Support for Flattened Embedding (Anonymous Fields)
+		if field.Anonymous {
+			// Ensure we are working with a struct for diving
+			actual := fieldVal
+			for actual.Kind() == reflect.Ptr {
+				if actual.IsNil() {
+					goto skip
+				}
+				actual = actual.Elem()
+			}
+			if actual.Kind() == reflect.Struct {
+				if err := bindStructFields(vm, obj, actual, visited); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+
+	skip:
 		jsVal, err := bindValue(vm, fieldVal, visited)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		_ = obj.Set(field.Name, jsVal)
 	}
-
-	bindMethods(vm, obj, v, visited)
-
-	return obj, nil
+	return nil
 }
 
 func bindMethods(vm *sobek.Runtime, obj *sobek.Object, v reflect.Value, visited map[uintptr]sobek.Value) {
@@ -106,11 +134,32 @@ func bindMethods(vm *sobek.Runtime, obj *sobek.Object, v reflect.Value, visited 
 	}
 }
 
+var argsPool = sync.Pool{
+	New: func() interface{} {
+		return make([]reflect.Value, 0, 8)
+	},
+}
+
 func createMethodWrapper(vm *sobek.Runtime, methodVal reflect.Value, methodName string, visited map[uintptr]sobek.Value) func(sobek.FunctionCall) sobek.Value {
 	return func(call sobek.FunctionCall) sobek.Value {
 		methodType := methodVal.Type()
 		numIn := methodType.NumIn()
-		goArgs := make([]reflect.Value, numIn)
+
+		// Optimize: Use pool for common small argument lists
+		var goArgs []reflect.Value
+		if numIn <= 8 {
+			goArgs = argsPool.Get().([]reflect.Value)[:0:8]
+			goArgs = goArgs[:numIn]
+			defer func() {
+				// Clear references before returning to pool
+				for i := range goArgs {
+					goArgs[i] = reflect.Value{}
+				}
+				argsPool.Put(goArgs[:0])
+			}()
+		} else {
+			goArgs = make([]reflect.Value, numIn)
+		}
 
 		for j := 0; j < numIn; j++ {
 			argType := methodType.In(j)

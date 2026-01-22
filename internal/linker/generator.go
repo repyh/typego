@@ -47,18 +47,16 @@ func GenerateTypes(info *PackageInfo) string {
 	// Collect imports
 	imports := make(map[string]map[string]bool) // pkgPath -> typeName -> bool
 	for _, st := range info.Structs {
+		// Collect from fields
 		for _, field := range st.Fields {
 			if field.ImportPath != "" && field.ImportPath != info.ImportPath {
-				if imports[field.ImportPath] == nil {
-					imports[field.ImportPath] = make(map[string]bool)
-				}
-				typeName := field.Type
-				if idx := strings.LastIndex(typeName, "."); idx != -1 {
-					typeName = typeName[idx+1:]
-				}
-				typeName = strings.TrimPrefix(typeName, "*")
-				typeName = strings.ReplaceAll(typeName, "[]", "")
-				imports[field.ImportPath][typeName] = true
+				collectImport(imports, field.ImportPath, field.Type)
+			}
+		}
+		// Collect from embeds
+		for _, embed := range st.Embeds {
+			if embed.ImportPath != "" && embed.ImportPath != info.ImportPath {
+				collectImport(imports, embed.ImportPath, embed.Name)
 			}
 		}
 	}
@@ -106,12 +104,16 @@ func generateStructInterfaceWithContext(st ExportedStruct, knownStructs map[stri
 
 	// Handle embedded types with extends clause
 	if len(st.Embeds) > 0 {
-		// Filter to only include known structs from this package
 		var validEmbeds []string
 		for _, embed := range st.Embeds {
-			if knownStructs == nil || knownStructs[embed] {
-				validEmbeds = append(validEmbeds, embed)
+			name := embed.Name
+			// Strip pointer and package prefix for the TS interface name
+			if idx := strings.LastIndex(name, "."); idx != -1 {
+				name = name[idx+1:]
 			}
+			name = strings.TrimPrefix(name, "*")
+
+			validEmbeds = append(validEmbeds, name)
 		}
 		if len(validEmbeds) > 0 {
 			sb.WriteString(fmt.Sprintf("\texport interface %s extends %s {\n", interfaceName, strings.Join(validEmbeds, ", ")))
@@ -230,6 +232,19 @@ func generateFunctionDeclWithContext(fn ExportedFunc, knownStructs map[string]bo
 
 	sb.WriteString(fmt.Sprintf("\texport function %s(%s): %s;\n", fn.Name, strings.Join(args, ", "), retType))
 	return sb.String()
+}
+
+func collectImport(imports map[string]map[string]bool, pkgPath, fullType string) {
+	if imports[pkgPath] == nil {
+		imports[pkgPath] = make(map[string]bool)
+	}
+	typeName := fullType
+	if idx := strings.LastIndex(typeName, "."); idx != -1 {
+		typeName = typeName[idx+1:]
+	}
+	typeName = strings.TrimPrefix(typeName, "*")
+	typeName = strings.ReplaceAll(typeName, "[]", "")
+	imports[pkgPath][typeName] = true
 }
 
 // This is used by the compiler to resolve imports like "go:github.com/..."
