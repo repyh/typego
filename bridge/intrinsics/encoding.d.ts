@@ -30,6 +30,11 @@ interface TextDecoder {
 
 declare var TextDecoder: {
     prototype: TextDecoder;
+    new(encoding?: string): TextDecoder;
+};
+
+declare var TextDecoder: {
+    prototype: TextDecoder;
     new(label?: string, options?: { fatal?: boolean; ignoreBOM?: boolean }): TextDecoder;
 };
 
