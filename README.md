@@ -288,24 +288,24 @@ const server = ListenAndServe(":8080", (w, r) => {
 File system interactions (sandboxed to CWD by default for security).
 
 ```typescript
-import { ReadFile, WriteFile, Mkdir, MkdirAll, Remove, RemoveAll, Getenv, Exit, Args } from "go:os";
+import * as os from "go:os";
 
 // Reading and Writing files
 try {
-    WriteFile("config.txt", "port=8080");
-    const content = ReadFile("config.txt");
+    os.WriteFile("config.txt", "port=8080");
+    const content = os.ReadFile("config.txt");
     console.log("Config:", content);
 } catch (e) {
     console.error("File error:", e);
 }
 
 // Directory management
-Mkdir("logs");
-MkdirAll("data/users/images");
+os.Mkdir("logs");
+os.MkdirAll("data/users/images");
 
 // Cleanup
-Remove("config.txt");
-RemoveAll("data");
+os.Remove("config.txt");
+os.RemoveAll("data");
 
 // Environment and Process
 const path = Getenv("PATH");
