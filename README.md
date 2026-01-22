@@ -13,33 +13,40 @@ typego is an embedded TypeScript runtime for Go. It lets you script Go applicati
 
 Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS engine (Sobek) directly inside your Go process. You can import Go packages as if they were native TS modules using the go: prefix, allowing for zero-copy data sharing and direct access to Go’s standard library.
 
-## Table of Contents
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
+## Index
+
+- [Overview](#overview)
+- [Quick Start](#quick-start)
   - [Installation](#installation)
-  - [Quick Start](#quick-start)
-- [Core Concepts](#core-concepts)
-  - [Project Structure](#project-structure)
-  - [Directory Index](#directory-index)
+  - [Usage](#usage)
+- [Language Reference](#language-reference)
+  - [Imports](#imports)
   - [Intrinsics](#intrinsics)
-- [Standard Library](#standard-library)
-  - [go:fmt](#gofmt)
-  - [go:net/http](#gonethttp)
-  - [go:os](#goos)
-  - [go:sync](#gosync)
-  - [typego:memory](#typegomemory)
-  - [typego:worker](#typegoworker)
-- [CLI Reference](#cli-reference)
-- [Examples](#examples)
-- [Applications](#applications)
-- [Limitations](#limitations)
-- [Performance](#performance)
-- [Runtime Comparison](#runtime-comparison)
+  - [Standard Library](#standard-library)
+    - [go:fmt](#gofmt)
+    - [go:net/http](#gonethttp)
+    - [go:os](#goos)
+    - [go:sync](#gosync)
+    - [typego:memory](#typegomemory)
+    - [typego:worker](#typegoworker)
+  - [Concurrency](#concurrency)
+  - [Memory Management](#memory-management)
+- [Tooling](#tooling)
+  - [CLI Reference](#cli-reference)
+  - [Package Management](#package-management)
+- [Ecosystem](#ecosystem)
+  - [Performance](#performance)
+  - [Runtime Comparison](#runtime-comparison)
 - [Development](#development)
 - [License](#license)
 
-## Features
+---
+
+## Overview
+
+TypeGo bridges the gap between Go's raw performance and TypeScript's developer experience. It is not just a JS runtime; it is a **hybrid runtime** where TypeScript code compiles JIT into the Go process, sharing memory and goroutines.
+
+### Features
 
 - **Direct Go Integration**: Import any Go package as a native TS module (`go:fmt`, `go:github.com/gin-gonic/gin`).
 - **Standard Library Intrinsics**: Direct access to Go-native keywords and types like `go` routines, `makeChan`, `select`, `defer`, `ref`/`deref`, and `make`/`cap`.
@@ -48,14 +55,9 @@ Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS 
 - **Modern Package Ecosystem**: Built-in CLI for managing Go dependencies with `typego.modules.json` and `typego.lock`.
 - **Fast Developer Loop**: Hot-reloading dev server and ~0.2s interpreter startup. Compiles to single-binary with `--compile`.
 
-## Tech Stack
+---
 
-- **Language**: Go 1.21+, TypeScript
-- **JS Engine**: Sobek (fork of Goja, pure Go)
-- **Bundler**: esbuild
-- **CLI**: Cobra
-
-## Getting Started
+## Quick Start
 
 ### Installation
 
@@ -63,54 +65,55 @@ Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS 
 go install github.com/repyh/typego/cmd/typego@latest
 ```
 
-### Quick Start
+### Usage
+
+**1. Initialize a Project**
 
 ```bash
 typego init myapp
 cd myapp
-typego run src/index.ts
 ```
 
-## Core Concepts
+**2. Run Development Server**
 
-### Project Structure
-
-A standard TypeGo project consists of the following structure:
-
-- `src/`: Directory for your TypeScript source files.
-- `typego.modules.json`: Dependency manifest for Go packages.
-- `typego.lock`: **[New]** Auto-generated lockfile for reproducible Go module versions.
-- `.typego/`: **[Internal]** Managed workspace for build artifacts and cached TypeScript types (`go.d.ts`).
-- `package.json`: Standard Node.js manifest for NPM dependencies (handled via esbuild).
-
-### Directory Index
-
-Overview of the TypeGo repository structure:
-
+```bash
+# Watch mode with hot-reload
+typego dev src/index.ts
 ```
-typego/
-├── bridge/                 # Native bindings & intrinsics
-│   ├── core/               # Low-level primitives (Reflection, Console)
-│   ├── intrinsics/         # Global functions (go, makeChan, etc.)
-│   ├── modules/            # Go stdlib shims (fmt, os, net/http)
-│   └── stdlib/             # TypeGo specific modules (memory, worker)
-├── cmd/
-│   └── typego/             # CLI entrypoint
-├── compiler/               # TypeScript compilation & bundling logic
-├── engine/                 # Sobek runtime wrapper & worker management
-├── eventloop/              # Event loop implementation
-├── internal/
-│   ├── builder/            # Template generation
-│   ├── ecosystem/          # Dependency management & toolchain
-│   ├── linker/             # Go type inspection & generation
-│   └── transformer/        # AST transformers
-└── pkg/
-    └── cli/                # CLI command implementations
+
+**3. Build for Production**
+
+```bash
+# Compile to a standalone binary
+typego build src/index.ts -o app
+./app
+```
+
+---
+
+## Language Reference
+
+### Imports
+
+TypeGo uses a unique import scheme to distinguish between TypeScript/JS modules and Go packages.
+
+```typescript
+// Import standard Go packages
+import { Println } from "go:fmt";
+
+// Import external Go modules (must be added via CLI first)
+import { Default } from "go:github.com/gin-gonic/gin";
+
+// Import TypeGo internal modules
+import { Worker } from "typego:worker";
+
+// Import relative TypeScript files
+import { util } from "./util";
 ```
 
 ### Intrinsics
 
-TypeGo provides first-class support for Go-native keywords and low-level primitives as global functions.
+TypeGo exposes low-level Go primitives as global functions, allowing you to write "Go-like" TypeScript.
 
 | Function | Type | Description |
 |----------|--------|-------------|
@@ -128,21 +131,11 @@ TypeGo provides first-class support for Go-native keywords and low-level primiti
 | `recover()` | Control | Recovers from a panic inside a `defer` block. |
 | `iota` | Constant | Auto-incrementing compile-time constant. |
 
-#### Process & Environment
-- `process.env`: Access environment variables.
-- `process.cwd()`: Get current working directory.
-- `process.platform`: OS platform (e.g., `linux`, `darwin`).
-- `process.version`: Go runtime version.
-
-#### Encoding
-- `TextEncoder().encode(str)`: Convert string to `Uint8Array`.
-- `TextDecoder().decode(bytes)`: Convert bytes to string.
-
-## Standard Library
+### Standard Library
 
 TypeGo includes pre-bound versions of common Go standard library packages.
 
-### go:fmt
+#### go:fmt
 Print formatted output to stdout/stderr.
 
 ```typescript
@@ -151,7 +144,7 @@ Println("Hello", "World");
 const msg = Sprintf("Value: %d", 42);
 ```
 
-### go:net/http
+#### go:net/http
 Make HTTP requests or run a server.
 
 ```typescript
@@ -167,7 +160,7 @@ ListenAndServe(":8080", (w, r) => {
 });
 ```
 
-### go:os
+#### go:os
 File system interactions (sandboxed to CWD by default).
 
 ```typescript
@@ -178,7 +171,7 @@ const content = ReadFile("test.txt");
 Exit(0);
 ```
 
-### go:sync
+#### go:sync
 Concurrency primitives.
 
 ```typescript
@@ -190,7 +183,7 @@ Spawn(async () => {
 });
 ```
 
-### typego:memory
+#### typego:memory
 Shared memory for workers.
 
 ```typescript
@@ -198,7 +191,7 @@ import { makeShared } from "typego:memory";
 const buf = makeShared("myBuffer", 1024); // Globally accessible as 'myBuffer'
 ```
 
-### typego:worker
+#### typego:worker
 Thread-based worker spawning.
 
 ```typescript
@@ -207,7 +200,39 @@ const w = new Worker("./worker.ts");
 w.postMessage({ task: "compute" });
 ```
 
-## CLI Reference
+### Concurrency
+
+TypeGo offers true parallelism via goroutines, distinct from Node.js's single-threaded event loop.
+
+```typescript
+import { Println } from "go:fmt";
+
+// Channels + select
+const ch = makeChan<number>(1);
+
+go(() => {
+  ch.send(42);
+});
+
+select([
+  { chan: ch, recv: (v) => Println("received:", v) },
+  { default: () => Println("no message") }
+]);
+```
+
+### Memory Management
+
+TypeGo manages memory automatically but provides tools for manual control when performance is critical.
+
+- **`defer(fn)`**: Schedules cleanup execution (similar to Go's `defer`).
+- **`ref(val)`**: Creates a pointer to a value, avoiding copy overhead for large structs.
+- **Shared Memory**: Use `typego:memory` to share buffers between workers without serialization.
+
+---
+
+## Tooling
+
+### CLI Reference
 
 | Command | Description |
 |---------|-------------|
@@ -224,104 +249,26 @@ w.postMessage({ task: "compute" });
 | `typego install` | Manually trigger JIT build/dependency resolution |
 | `typego clean` | Reset build cache and temporary workspace |
 
-## Examples
+### Package Management
 
-### Go Imports
-```typescript
-import { Println, Printf } from "go:fmt";
-import { Sleep } from "go:sync";
+TypeGo uses a `typego.modules.json` file to manage Go dependencies. This allows you to use any Go package in your TypeScript code.
 
-Println("Hello from Go!");
-await Sleep(1000);
-Printf("Done after %dms\n", 1000);
+```bash
+# Add a Go package. Ecosystem will automatically resolve versions and sync types.
+typego add github.com/gin-gonic/gin
 ```
 
-### Workers & Shared Memory
-```typescript
-import { makeShared } from "typego:memory";
-import { Worker } from "typego:worker";
+TypeGo automatically manages a `.typego/` workspace, handling `go mod tidy`, JIT compilation, and TypeScript definition syncing behind the scenes.
 
-const shared = makeShared("buffer", 1024);
-const worker = new Worker("worker.ts");
-worker.postMessage({ buffer: shared });
-```
+---
 
-### Concurrency
-```typescript
-import { Spawn, Sleep } from "go:sync";
+## Ecosystem
 
-Spawn(async () => {
-  for (let i = 0; i < 5; i++) {
-    await Sleep(500);
-    console.log(`Heartbeat ${i}`);
-  }
-});
-```
-
-### Intrinsics
-A short example demonstrating channels, `select`, and pointer handles (`ref`/`deref`).
-
-```typescript
-import { Println } from "go:fmt";
-
-// Channels + select
-const ch = makeChan<number>(1);
-
-go(() => {
-  ch.send(42);
-});
-
-select([
-  { chan: ch, recv: (v) => Println("received:", v) },
-  { default: () => Println("no message") }
-]);
-
-// Pointer handles
-const r = ref(100);
-Println("before:", deref(r)); // 100
-r.value = 200;
-Println("after:", deref(r)); // 200
-
-// TypedArray helpers
-const buf = make(Uint8Array, 4);
-Println("capacity:", cap(buf));
-```
-
-## Applications
-
-| Field | Can Do | Cannot Do |
-|-------|--------|-----------|
-| **Networking** | HTTP/WebSocket/TCP servers, proxies | Kernel networking, eBPF |
-| **Backend** | REST APIs, microservices, job queues | Native DB drivers (no CGO) |
-| **CLI Tools** | Build tools, code generators, automation | Native GUI |
-| **Data Processing** | JSON/CSV, log aggregation, parallel ETL | GPU acceleration |
-| **DevOps** | Health checks, log shippers, K8s clients | Container runtimes |
-| **Real-Time** | Chat servers, game servers, notifications | Hard real-time |
-
-## Limitations
-
-| Limitation | Impact |
-|------------|--------|
-| No JIT compilation | ~10x slower raw JS than V8-based runtimes |
-| No Web APIs | No DOM, fetch, localStorage |
-| No CGO | Can't call C libraries |
-| Explicit shared memory | Must use `makeShared()` |
-
-## When to Use
-
-| ✅ Good Fit | ❌ Use Alternatives |
-|------------|---------------------|
-| Backend needing true parallelism | Browser/frontend apps |
-| CLI tools with single binary | Data science (use Python) |
-| TypeScript team wanting Go perf | Systems programming (use Rust/Go) |
-| Serverless/edge (small binary) | Mobile apps |
-
-## Performance
+### Performance
 
 TypeGo is optimized for high-throughput I/O and true parallelism. For a detailed breakdown of the execution model, interop overhead, and optimization strategies, see **[OPTIMIZATION.md](OPTIMIZATION.md)**.
 
-
-## Runtime Comparison
+### Runtime Comparison
 
 | Feature | TypeGo | Node.js | Deno | Bun |
 |---------|:------:|:-------:|:----:|:---:|
@@ -330,6 +277,8 @@ TypeGo is optimized for high-throughput I/O and true parallelism. For a detailed
 | Single binary | ✅ | ❌ | ✅ | ❌ |
 | Shared memory | ✅ | ⚠️ | ⚠️ | ⚠️ |
 | NPM ecosystem | ⚠️ | ✅ | ⚠️ | ✅ |
+
+---
 
 ## Development
 
@@ -353,6 +302,8 @@ go build -o typego.exe ./cmd/typego
 ./typego run examples/02-concurrency-basics.ts
 ./typego run examples/09-typego-stdlib.ts
 ```
+
+---
 
 ## License
 
