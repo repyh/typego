@@ -165,7 +165,8 @@ func bindMethods(vm *sobek.Runtime, obj *sobek.Object, v reflect.Value, visited 
 
 var argsPool = sync.Pool{
 	New: func() interface{} {
-		return make([]reflect.Value, 0, 8)
+		s := make([]reflect.Value, 0, 8)
+		return &s
 	},
 }
 
@@ -176,15 +177,18 @@ func createMethodWrapper(vm *sobek.Runtime, methodVal reflect.Value, methodName 
 	return func(call sobek.FunctionCall) sobek.Value {
 		// Optimize: Use pool for common small argument lists
 		var goArgs []reflect.Value
+		var pGoArgs *[]reflect.Value
+
 		if numIn <= 8 {
-			goArgs = argsPool.Get().([]reflect.Value)[:0:8]
+			pGoArgs = argsPool.Get().(*[]reflect.Value)
+			goArgs = (*pGoArgs)[:0:8]
 			goArgs = goArgs[:numIn]
 			defer func() {
 				// Clear references before returning to pool
 				for i := range goArgs {
 					goArgs[i] = reflect.Value{}
 				}
-				argsPool.Put(goArgs[:0])
+				argsPool.Put(pGoArgs)
 			}()
 		} else {
 			goArgs = make([]reflect.Value, numIn)
