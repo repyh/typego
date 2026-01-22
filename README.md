@@ -13,6 +13,32 @@ typego is an embedded TypeScript runtime for Go. It lets you script Go applicati
 
 Unlike typical runtimes that communicate over IPC or JSON-RPC, typego runs a JS engine (Sobek) directly inside your Go process. You can import Go packages as if they were native TS modules using the go: prefix, allowing for zero-copy data sharing and direct access to Go’s standard library.
 
+## Table of Contents
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+  - [Project Structure](#project-structure)
+  - [Directory Index](#directory-index)
+  - [Intrinsics](#intrinsics)
+- [Standard Library](#standard-library)
+  - [go:fmt](#gofmt)
+  - [go:net/http](#gonethttp)
+  - [go:os](#goos)
+  - [go:sync](#gosync)
+  - [typego:memory](#typegomemory)
+  - [typego:worker](#typegoworker)
+- [CLI Reference](#cli-reference)
+- [Examples](#examples)
+- [Applications](#applications)
+- [Limitations](#limitations)
+- [Performance](#performance)
+- [Runtime Comparison](#runtime-comparison)
+- [Development](#development)
+- [License](#license)
+
 ## Features
 
 - **Direct Go Integration**: Import any Go package as a native TS module (`go:fmt`, `go:github.com/gin-gonic/gin`).
@@ -45,7 +71,44 @@ cd myapp
 typego run src/index.ts
 ```
 
-## Standard Library Intrinsics
+## Core Concepts
+
+### Project Structure
+
+A standard TypeGo project consists of the following structure:
+
+- `src/`: Directory for your TypeScript source files.
+- `typego.modules.json`: Dependency manifest for Go packages.
+- `typego.lock`: **[New]** Auto-generated lockfile for reproducible Go module versions.
+- `.typego/`: **[Internal]** Managed workspace for build artifacts and cached TypeScript types (`go.d.ts`).
+- `package.json`: Standard Node.js manifest for NPM dependencies (handled via esbuild).
+
+### Directory Index
+
+Overview of the TypeGo repository structure:
+
+```
+typego/
+├── bridge/                 # Native bindings & intrinsics
+│   ├── core/               # Low-level primitives (Reflection, Console)
+│   ├── intrinsics/         # Global functions (go, makeChan, etc.)
+│   ├── modules/            # Go stdlib shims (fmt, os, net/http)
+│   └── stdlib/             # TypeGo specific modules (memory, worker)
+├── cmd/
+│   └── typego/             # CLI entrypoint
+├── compiler/               # TypeScript compilation & bundling logic
+├── engine/                 # Sobek runtime wrapper & worker management
+├── eventloop/              # Event loop implementation
+├── internal/
+│   ├── builder/            # Template generation
+│   ├── ecosystem/          # Dependency management & toolchain
+│   ├── linker/             # Go type inspection & generation
+│   └── transformer/        # AST transformers
+└── pkg/
+    └── cli/                # CLI command implementations
+```
+
+### Intrinsics
 
 TypeGo provides first-class support for Go-native keywords and low-level primitives as global functions.
 
@@ -65,17 +128,86 @@ TypeGo provides first-class support for Go-native keywords and low-level primiti
 | `recover()` | Control | Recovers from a panic inside a `defer` block. |
 | `iota` | Constant | Auto-incrementing compile-time constant. |
 
-## Project Structure
+#### Process & Environment
+- `process.env`: Access environment variables.
+- `process.cwd()`: Get current working directory.
+- `process.platform`: OS platform (e.g., `linux`, `darwin`).
+- `process.version`: Go runtime version.
 
-A standard TypeGo project consists of the following structure:
+#### Encoding
+- `TextEncoder().encode(str)`: Convert string to `Uint8Array`.
+- `TextDecoder().decode(bytes)`: Convert bytes to string.
 
-- `src/`: Directory for your TypeScript source files.
-- `typego.modules.json`: Dependency manifest for Go packages.
-- `typego.lock`: **[New]** Auto-generated lockfile for reproducible Go module versions.
-- `.typego/`: **[Internal]** Managed workspace for build artifacts and cached TypeScript types (`go.d.ts`).
-- `package.json`: Standard Node.js manifest for NPM dependencies (handled via esbuild).
+## Standard Library
 
-### Commands
+TypeGo includes pre-bound versions of common Go standard library packages.
+
+### go:fmt
+Print formatted output to stdout/stderr.
+
+```typescript
+import { Println, Sprintf } from "go:fmt";
+Println("Hello", "World");
+const msg = Sprintf("Value: %d", 42);
+```
+
+### go:net/http
+Make HTTP requests or run a server.
+
+```typescript
+import { Get, Post, ListenAndServe } from "go:net/http";
+
+// Client
+const resp = Get("https://example.com");
+console.log(resp.Status);
+
+// Server
+ListenAndServe(":8080", (w, r) => {
+    // Note: Handler signature adaptation might be needed depending on usage
+});
+```
+
+### go:os
+File system interactions (sandboxed to CWD by default).
+
+```typescript
+import { ReadFile, WriteFile, Exit } from "go:os";
+
+WriteFile("test.txt", "Hello TypeGo");
+const content = ReadFile("test.txt");
+Exit(0);
+```
+
+### go:sync
+Concurrency primitives.
+
+```typescript
+import { Spawn, Sleep } from "go:sync";
+
+Spawn(async () => {
+    await Sleep(100);
+    console.log("Async work done");
+});
+```
+
+### typego:memory
+Shared memory for workers.
+
+```typescript
+import { makeShared } from "typego:memory";
+const buf = makeShared("myBuffer", 1024); // Globally accessible as 'myBuffer'
+```
+
+### typego:worker
+Thread-based worker spawning.
+
+```typescript
+import { Worker } from "typego:worker";
+const w = new Worker("./worker.ts");
+w.postMessage({ task: "compute" });
+```
+
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
@@ -91,25 +223,6 @@ A standard TypeGo project consists of the following structure:
 | `typego outdated` | Check for newer Go module versions |
 | `typego install` | Manually trigger JIT build/dependency resolution |
 | `typego clean` | Reset build cache and temporary workspace |
-
-### Package Management
-
-TypeGo uses a `typego.modules.json` file to manage Go dependencies. This allows you to use any Go package in your TypeScript code.
-
-```bash
-# Add a Go package. Ecosystem will automatically resolve versions and sync types.
-typego add github.com/gin-gonic/gin
-```
-```typescript
-// src/index.ts
-import { Default } from "go:github.com/gin-gonic/gin";
-
-const app = Default();
-app.GET("/ping", (c) => c.JSON(200, { message: "pong" }));
-app.Run();
-```
-
-TypeGo automatically manages a `.typego/` workspace, handling `go mod tidy`, JIT compilation, and TypeScript definition syncing behind the scenes.
 
 ## Examples
 
@@ -237,8 +350,8 @@ go build -o typego.exe ./cmd/typego
 
 ```bash
 ./typego run examples/01-hello-world.ts
-./typego run examples/02-go-concurrency.ts
-./typego run examples/10-typego-stdlib.ts
+./typego run examples/02-concurrency-basics.ts
+./typego run examples/09-typego-stdlib.ts
 ```
 
 ## License
