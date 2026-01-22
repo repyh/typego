@@ -486,10 +486,16 @@ Use `typego:memory` to share buffers between workers without serialization.
 import { makeShared } from "typego:memory";
 
 // Main thread
-const shared = makeShared("pixels", 1920 * 1080 * 4); // 8MB buffer
+const shared = makeShared("pixels", 1920 * 1080 * 4); // { buffer, mutex } with 8MB buffer
+
+// Create a view over the shared buffer
+const pixels = new Uint8ClampedArray(shared.buffer);
+// When mutating shared state, coordinate using shared.mutex
 
 // Worker thread
-// (Access via global name 'pixels' or passed reference)
+// Receive the same { buffer, mutex } (e.g. via message from main or a global binding)
+// const workerPixels = new Uint8ClampedArray(shared.buffer);
+// Use shared.mutex here as well when writing
 ```
 
 #### Defer
