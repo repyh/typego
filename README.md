@@ -2,9 +2,13 @@
 
 # TypeGo
 
-typego is an embedded TypeScript runtime for Go. It lets you script Go applications with TS without the overhead of Node.js or the boilerplate of manual FFI bindings.
+TypeGo is an embedded TypeScript runtime for Go. It lets you script Go applications with TS without the overhead of Node.js or the boilerplate of manual FFI bindings.</br></br>
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
+[![Version](https://img.shields.io/badge/version-1.5.0-orange)]()
+</br>
 
-[Getting Started](#getting-started) • [Features](#features) • [Examples](#examples) • [Optimization](OPTIMIZATION.md) • [Contributing](CONTRIBUTING.md) • [License](#license)
+[Examples](/examples/) • [Optimization](OPTIMIZATION.md) • [Contributing](CONTRIBUTING.md) • [License](#license)
 
 </div>
 
