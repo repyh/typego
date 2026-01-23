@@ -16,13 +16,19 @@ All notable changes to this project will be documented in this file.
 - **`makeChan()` & `select()`**: Native Go channels and multiplexing for robust concurrent communication between JS tasks.
 - **`iota`**: Support for auto-incrementing compile-time constants.
 
+### Performance & Polyfill Consolidation
+- **Native Go Backends**: Migrated `Buffer`, `TextEncoder`, and `TextDecoder` to high-performance Go-native intrinsics. This eliminates slow JavaScript loops and provides O(1) character conversion complexity.
+- **Consolidated Registry**: Removed the legacy `bridge/polyfills` directory and unified all environment globals (`process`, `timers`, etc.) into the core `intrinsics` registry.
+- **Thread-Safe Runtime**: Introduced a global `VMLock` and a non-blocking `select` loop that yields this lock, allowing Go goroutines to safely interact with the single-threaded JavaScript environment.
+
 ### Memory & Pointers
 - **Pointer Intrinsics**: Introduced `ref()` and `deref()` for explicit variable tracking and reference management.
 - **Slice Primitives**: Added `make()`, `cap()`, and `copy()` to provide Go-like performance for TypedArray manipulation.
 
-### DX & CLI
-- **New Examples**: Revamped the `examples/` directory with detailed showcases for concurrency, memory management, and advanced control flow.
-- **IntelliSense Expansion**: Full TypeScript definitions for all new intrinsics integrated into the automatic type generation pipeline.
+### Maintenance & Stability
+- **Bridge Refinement**: Resolved `SA6002` lint errors in `bridge/core/reflection.go` by utilizing a pointer-based `sync.Pool`, reducing allocations during method invocation.
+- **CI Hardening**: Corrected YAML syntax in the `validate-examples` workflow and improved health check reliability for broader project verification.
+- **IntelliSense Expansion**: Full TypeScript definitions for all new intrinsics (including pointers and recovery) integrated into the automatic type generation pipeline.
 
 ## [v1.4.0] - 2026-01-21
 

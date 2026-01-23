@@ -9,6 +9,7 @@ This document outlines the planned technical direction for **TypeGo**. Please no
 - [x] **Sobek Engine Migration**: Move from Goja to Sobek to support ES2017+ features (async/await, promises) and improve memory efficiency without using CGO.
 - [x] **Recursive Linker Upgrade**: Support for recursive type resolution, Go struct embedding, and JIT interface inspection for transparent bridging.
 - [x] **Global Intrinsics**: Support for Go-native keywords as top-level functions: `defer()`, `panic()`, `recover()`, `sizeof()`, and `iota`.
+- [x] **Polyfill Consolidation**: Migration of legacy JS polyfills (`Buffer`, `Encoding`, `timers`) to high-performance native Go intrinsics.
 
 ### Low-Level Memory
 - [x] **Ref<T> API**: Implement explicit pointer management for primitives and Go structs with `ref()` and `deref()` access.
