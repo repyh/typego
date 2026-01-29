@@ -15,7 +15,7 @@ func BenchmarkBindMap(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		BindStruct(vm, "testMap", m)
+		_ = BindStruct(vm, "testMap", m)
 	}
 }
 
@@ -28,6 +28,6 @@ func BenchmarkBindMapIntKeys(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		BindStruct(vm, "testMapInt", m)
+		_ = BindStruct(vm, "testMapInt", m)
 	}
 }
