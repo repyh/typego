@@ -124,18 +124,22 @@ func (el *EventLoop) CreatePromise() (promise *sobek.Object, resolve func(interf
 	// Keep the loop alive until the promise is settled
 	el.wg.Add(1)
 
-	resolve = func(v interface{}) {
-		el.RunOnLoop(func() {
-			_ = res(v)
-			el.wg.Done()
+	var once sync.Once
+	finish := func(cb func()) {
+		once.Do(func() {
+			el.RunOnLoop(func() {
+				cb()
+				el.wg.Done()
+			})
 		})
 	}
 
+	resolve = func(v interface{}) {
+		finish(func() { _ = res(v) })
+	}
+
 	reject = func(v interface{}) {
-		el.RunOnLoop(func() {
-			_ = rej(v)
-			el.wg.Done()
-		})
+		finish(func() { _ = rej(v) })
 	}
 
 	return el.VM.ToValue(p).ToObject(el.VM), resolve, reject

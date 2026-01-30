@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 
 	"github.com/grafana/sobek"
@@ -32,6 +33,8 @@ var typeMethodCache sync.Map
 
 // cache for struct field metadata: reflect.Type -> []fieldInfo
 var typeFieldCache sync.Map
+
+var stringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 
 // BindStruct exposes a Go struct to JavaScript with full field and method access.
 // Supports nested structs (converted recursively) and callback arguments.
@@ -352,20 +355,41 @@ func bindSlice(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Val
 
 func bindMap(vm *sobek.Runtime, v reflect.Value, visited map[uintptr]sobek.Value) (sobek.Value, error) {
 	obj := vm.NewObject()
-	for _, key := range v.MapKeys() {
+
+	// Check if key type implements fmt.Stringer to ensure custom formatting is respected.
+	isStringer := v.Type().Key().Implements(stringerType)
+
+	iter := v.MapRange()
+	for iter.Next() {
+		key := iter.Key()
+		val := iter.Value()
+
 		var keyStr string
-		// @optimized: Avoid Sprintf if key is already a string.
-		if key.Kind() == reflect.String {
-			keyStr = key.String()
-		} else {
+		if isStringer {
 			keyStr = fmt.Sprint(key.Interface())
+		} else {
+			// @optimized: Use MapRange and strconv to avoid allocation and boxing.
+			switch key.Kind() {
+			case reflect.String:
+				keyStr = key.String()
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				keyStr = strconv.FormatInt(key.Int(), 10)
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				keyStr = strconv.FormatUint(key.Uint(), 10)
+			case reflect.Float64:
+				keyStr = strconv.FormatFloat(key.Float(), 'g', -1, 64)
+			case reflect.Float32:
+				keyStr = strconv.FormatFloat(key.Float(), 'g', -1, 32)
+			default:
+				keyStr = fmt.Sprint(key.Interface())
+			}
 		}
 
-		val, err := bindValue(vm, v.MapIndex(key), visited)
+		jsVal, err := bindValue(vm, val, visited)
 		if err != nil {
 			return nil, err
 		}
-		_ = obj.Set(keyStr, val)
+		_ = obj.Set(keyStr, jsVal)
 	}
 	return obj, nil
 }
